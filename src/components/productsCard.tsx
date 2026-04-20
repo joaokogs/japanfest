@@ -13,10 +13,15 @@ type Product = {
 type ProductsCardProps = {
 	product: Product;
 	onQuantityChange?: (id: number, quantity: number) => void;
+	initialQuantity?: number;
 };
 
-export const ProductsCard: React.FC<ProductsCardProps> = ({ product, onQuantityChange }) => {
-	const [quantity, setQuantity] = useState(0);
+export const ProductsCard: React.FC<ProductsCardProps> = ({ product, onQuantityChange, initialQuantity = 0 }) => {
+	const [quantity, setQuantity] = useState<number>(initialQuantity ?? 0);
+
+	React.useEffect(() => {
+		setQuantity(initialQuantity ?? 0);
+	}, [initialQuantity]);
 
 	const handleDecrement = () => {
 		const next = Math.max(0, quantity - 1);
