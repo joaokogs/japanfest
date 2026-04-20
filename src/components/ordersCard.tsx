@@ -12,9 +12,8 @@ type OrderItem = {
 type Order = {
 	id: number;
 	table?: string;
-	isTakeout?: boolean;
+	prioridade?: boolean;
 	status: OrderStatus;
-	time: string;
 	items: OrderItem[];
 };
 
@@ -24,12 +23,14 @@ type OrdersCardProps = {
 	onFinish?: () => void;
 };
 
-export const OrdersCard: React.FC<OrdersCardProps> = ({ order, onCancel, onFinish }) => {
+export const OrdersCard: React.FC<OrdersCardProps> = ({ order,  onFinish }) => {
+	const accent = order.prioridade ? '#4caf50' : '#f5a623';
+
 	return (
 		<div
 			style={{
 				color: "#333",
-				border: "1px solid #f5a623",
+				border: `1px solid ${accent}`,
 				borderRadius: 16,
 				background: "#fff",
 				minWidth: 340,
@@ -51,31 +52,21 @@ export const OrdersCard: React.FC<OrdersCardProps> = ({ order, onCancel, onFinis
 					top: 0,
 					bottom: 0,
 					width: 5,
-					background: "#f5a623",
+					background: accent,
 					borderTopLeftRadius: 16,
 					borderBottomLeftRadius: 16,
+					zIndex: 3,
 				}}
 			/>
 			<div style={{ flex: 1, padding: "32px 28px 100px 36px", zIndex: 1 }}>
-				<div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-					<span style={{ color: "#f5a623", fontWeight: 600, fontSize: 14 }}>
-						{order.isTakeout ? "PARA VIAGEM" : `MESA ${order.table}`}
-					</span>
-					<span style={{ color: "#888", fontSize: 14, display: "flex", alignItems: "center", gap: 4 }}>
-						<span role="img" aria-label="clock">⏱️</span> {order.time}
-					</span>
-				</div>
+				<div style={{ marginBottom: 12 }} />
 				<div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
-					<span style={{ fontWeight: 700, fontSize: 44 }}>#{order.id}</span>
-					{order.status === "NOVO" && (
-						<span style={{ background: "#ff9800", color: "#fff", borderRadius: 4, padding: "2px 10px", fontSize: 13, fontWeight: 600 }}>NOVO</span>
-					)}
-					{order.status === "RECENTE" && (
-						<span style={{ background: "#f5a623", color: "#fff", borderRadius: 4, padding: "2px 10px", fontSize: 13, fontWeight: 600 }}>RECENTE</span>
-					)}
-					{order.status === "EM PREPARO" && (
-						<span style={{ background: "#bdbdbd", color: "#fff", borderRadius: 4, padding: "2px 10px", fontSize: 13, fontWeight: 600 }}>EM PREPARO</span>
-					)}
+					<div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+						<span style={{ fontWeight: 700, fontSize: 44 }}>#{order.id}</span>
+						{order.prioridade && (
+							<span style={{ background: accent, color: "#fff", borderRadius: 4, padding: "4px 8px", fontSize: 13, fontWeight: 600 }}>Prioridade</span>
+						)}
+					</div>
 				</div>
 				<div style={{ marginBottom: 0 }}>
 					{order.items.map((item, idx) => (
@@ -101,38 +92,30 @@ export const OrdersCard: React.FC<OrdersCardProps> = ({ order, onCancel, onFinis
 					zIndex: 2,
 				}}
 			>
-				<div style={{ display: "flex", gap: 14 }}>
-					<button
-						style={{
-							flex: 1,
-							border: "1px solid #bdbdbd",
-							background: "#fff",
-							color: "#888",
-							borderRadius: 6,
-							padding: "14px 0",
-							fontWeight: 600,
-							fontSize: 16,
-							cursor: "pointer"
-						}}
-						onClick={onCancel}
-					>
-						ANULAR
-					</button>
+				<div style={{ display: "flex" }}>
 					<button
 						style={{
 							flex: 1,
 							border: "none",
-							background: "#f5a623",
+							background: accent,
 							color: "#fff",
 							borderRadius: 6,
 							padding: "14px 0",
 							fontWeight: 600,
 							fontSize: 16,
-							cursor: "pointer"
+							cursor: "pointer",
+							display: "flex",
+							alignItems: "center",
+							justifyContent: "center",
+							gap: 8
 						}}
 						onClick={onFinish}
+						aria-label="Marcar como Pronto"
 					>
-						CONCLUIR
+						<svg role="img" aria-label="Ícone de concluído" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width={18} height={18} style={{ display: "inline-block" }}>
+							<path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15l-5-5 1.41-1.41L11 14.17l7.59-7.59L20 8l-9 9z" />
+						</svg>
+						<span>Marcar como Pronto</span>
 					</button>
 				</div>
 			</div>
@@ -143,9 +126,8 @@ export const OrdersCard: React.FC<OrdersCardProps> = ({ order, onCancel, onFinis
 export const mockOrders: Order[] = [
 	{
 		id: 410,
-		isTakeout: true,
+		prioridade: true,
 		status: "RECENTE",
-		time: "00:12",
 		items: [
 			{ name: "Burger Culinary Atelier", quantity: 3 },
 			{ name: "Batatas Trufadas", quantity: 3 }
@@ -155,7 +137,6 @@ export const mockOrders: Order[] = [
 		id: 402,
 		table: "12",
 		status: "NOVO",
-		time: "14:22",
 		items: [
 			{ name: "Wagyu Tartare", quantity: 2, note: "Sem Cebolinha" },
 			{ name: "Risoto de Trufas", quantity: 1, note: "Extra Parmesão" }
@@ -165,7 +146,6 @@ export const mockOrders: Order[] = [
 		id: 405,
 		table: "04",
 		status: "EM PREPARO",
-		time: "08:15",
 		items: [
 			{ name: "Vieiras Grelhadas", quantity: 4 },
 			{ name: "Confit de Pato", quantity: 1 }
@@ -175,7 +155,6 @@ export const mockOrders: Order[] = [
 		id: 408,
 		table: "09",
 		status: "NOVO",
-		time: "02:44",
 		items: [
 			{ name: "Ribeye Maturado", quantity: 1, note: "AO PONTO P/ MAL" }
 		]
