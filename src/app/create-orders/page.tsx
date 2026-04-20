@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { ProductsCard } from "@/components/productsCard";
+import "./create-orders.css";
 
 type Product = {
 	id: number;
@@ -87,50 +88,45 @@ export default function CreateOrdersPage() {
 	];
 
 	return (
-		<div style={{ display: "flex", height: "100vh", overflow: "hidden", background: "#f7f7f5", fontFamily: "sans-serif" }}>
-			<div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-				<div style={{ padding: "32px 24px 0", flexShrink: 0 }}>
-					<div style={{ display: "flex", gap: 10, marginBottom: 28, flexWrap: "wrap" }}>
-						{filterLabels.map(({ key, label }) => (
-							<button
-								key={key}
-								onClick={() => setFilter(key)}
-								style={{
-									padding: "8px 20px",
-									borderRadius: 12,
-									border: filter === key ? "none" : "1px solid rgba(0,0,0,0.06)",
-									background: filter === key ? "#f08918" : "#efefef",
-									color: filter === key ? "#fff" : "#444",
-									fontWeight: filter === key ? 700 : 600,
-									fontSize: 14,
-									cursor: "pointer",
-									transition: "all 0.15s",
-									whiteSpace: "nowrap",
-									boxShadow: filter === key ? "0 6px 14px rgba(240,137,24,0.12)" : "none",
-								}}
-							>
-								{label}
-							</button>
-						))}
+		<div className="create-orders-root">
+				<div className="content">
+					<div className="filters">
+						<div style={{ display: "flex", gap: 10, marginBottom: 28, flexWrap: "wrap" }}>
+							{filterLabels.map(({ key, label }) => (
+								<button
+									key={key}
+									onClick={() => setFilter(key)}
+									className="btn"
+									style={{
+										border: filter === key ? "none" : "1px solid rgba(0,0,0,0.06)",
+										background: filter === key ? "#f08918" : "#efefef",
+										color: filter === key ? "#fff" : "#444",
+										fontWeight: filter === key ? 700 : 600,
+										boxShadow: filter === key ? "0 6px 14px rgba(240,137,24,0.12)" : "none",
+									}}
+								>
+									{label}
+								</button>
+							))}
+						</div>
+					</div>
+
+					<div className="products-wrap">
+						<div className="products-grid">
+							{filteredProducts.map((product) => (
+								<ProductsCard
+									key={product.id}
+									product={product}
+									onQuantityChange={handleQuantityChange}
+									initialQuantity={quantities[product.id] ?? 0}
+								/>
+							))}
+						</div>
 					</div>
 				</div>
 
-				<div style={{ flex: 1, overflowY: "auto", padding: "0 24px 32px" }}>
-					<div style={{ display: "flex", flexWrap: "wrap", gap: 0 }}>
-						{filteredProducts.map((product) => (
-							<ProductsCard
-								key={product.id}
-								product={product}
-								onQuantityChange={handleQuantityChange}
-								initialQuantity={quantities[product.id] ?? 0}
-							/>
-						))}
-					</div>
-				</div>
-			</div>
-
-			<div style={{ width: 340, padding: 20, display: "flex", flexShrink: 0 }}>
-				<div style={{ width: "100%", background: "#fff", borderRadius: 12, padding: 18, display: "flex", flexDirection: "column", height: "calc(100vh - 40px)" }}>
+				<div className="sidebar">
+					<div className="sidebar-panel">
 					<div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
 						<h2 style={{ fontSize: 18, fontWeight: 700, color: "#222", margin: 0 }}>Resumo do Pedido</h2>
 						{totalItemsCount > 0 ? (

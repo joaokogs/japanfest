@@ -36,68 +36,18 @@ export const ProductsCard: React.FC<ProductsCardProps> = ({ product, onQuantityC
 	};
 
 	return (
-		<div
-			data-priority={product.priority ? "true" : "false"}
-			style={{
-				width: 260,
-				position: "relative",
-				paddingBottom: 92,
-				borderRadius: 8,
-				background: "#fff",
-				boxShadow: "0 2px 12px rgba(0,0,0,0.08)",
-				overflow: "hidden",
-				display: "flex",
-				flexDirection: "column",
-				margin: 8,
-			}}
-		>
+		<div data-priority={product.priority ? "true" : "false"} className="product-card">
 			<img
 				src={product.image}
 				alt={product.name}
-				style={{ width: "100%", height: 180, objectFit: "cover", display: "block" }}
+                
 			/>
-			<div style={{ padding: "12px 14px 14px" }}>
-				<span
-					style={{
-						fontWeight: 700,
-						fontSize: 15,
-						color: "#222",
-						display: "block",
-						whiteSpace: "normal",
-						wordBreak: "break-word",
-						lineHeight: 1.2,
-						marginBottom: 8
-					}}
-				>
-					{product.name}
-				</span>
-			</div>
+			<div className="title">{product.name}</div>
 
-			<div style={{
-				position: "absolute",
-				left: 0,
-				right: 0,
-				bottom: 0,
-				padding: "12px 14px",
-				display: "flex",
-				alignItems: "center",
-				justifyContent: "space-between",
-				borderTop: "1px solid #eee",
-				background: "#fff"
-			}}>
-				<span style={{ fontWeight: 700, fontSize: 16, color: "#222" }}>
-					R$ {product.price.toFixed(2).replace(".", ",")}
-				</span>
-				<div style={{ display: "flex", alignItems: "center" }}>
-					<div style={{
-						display: "flex",
-						alignItems: "center",
-						gap: 12,
-						padding: "6px 8px",
-						borderRadius: 12,
-						background: "#fff6f0",
-						border: "1px solid #f4d9c7"
-					}}>
+			<div className="footer">
+				<span className="price">R$ {product.price.toFixed(2).replace(".", ",")}</span>
+				<div className="qty-controls">
+					<div className="qty-pill">
 						<button
 							onClick={handleDecrement}
 							style={{
