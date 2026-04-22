@@ -1,43 +1,51 @@
 "use client";
 
-import React, { useState, useCallback, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import QueueCard from "@/components/queueCard";
-import ReadyCelebration from "@/components/readyCelebration";
-
-const INITIAL_READY = ["A12", "B03"];
-const INITIAL_PREPARING = ["A15", "B09", "C11", "D04", "E02"];
 
 export default function QueuePage() {
-  const [ready, setReady] = useState<string[]>(INITIAL_READY);
-  const [preparing, setPreparing] = useState<string[]>(INITIAL_PREPARING);
-  const [celebrating, setCelebrating] = useState<string | null>(null);
-  const pendingRef = useRef<string | null>(null);
+  const [ready, setReady] = useState<string[]>([]);
+  const [preparing, setPreparing] = useState<string[]>([]);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [cardSize, setCardSize] = useState<number>(140);
   const [pageFontScale, setPageFontScale] = useState<number>(1);
   const s = (n: number) => `${Math.round(n * pageFontScale)}px`;
 
-  const simulateWebhook = useCallback(() => {
-    if (preparing.length === 0) return;
-    const next = preparing[0];
-    pendingRef.current = next;
-    setPreparing((prev) => prev.slice(1));
-    setCelebrating(next);
-  }, [preparing]);
-
-  const handleCelebrationDone = useCallback(() => {
-    if (pendingRef.current) {
-      setReady((prev) => [pendingRef.current!, ...prev]);
-      pendingRef.current = null;
-    }
-    setCelebrating(null);
+  useEffect(() => {
+    let mounted = true;
+    fetch("/api/orders")
+      .then(async (r) => {
+        if (!r.ok) {
+          const txt = await r.text().catch(() => "<no body>");
+          console.error(`Failed to fetch /api/orders. HTTP ${r.status}`, txt);
+          return [];
+        }
+        const ct = (r.headers.get("content-type") || "").toLowerCase();
+        if (ct.includes("application/json")) return r.json();
+        const text = await r.text().catch(() => "<unreadable>");
+        console.error("/api/orders returned non-JSON:", text);
+        return [];
+      })
+      .then((data: any[]) => {
+        if (!mounted) return;
+        const readyOrders = (data || [])
+          .filter((o: any) => o.status === "Pronto")
+          .map((o: any) => String(o.id));
+        const filaOrders = (data || [])
+          .filter((o: any) => o.status === "Fila")
+          .map((o: any) => String(o.id));
+        setReady(readyOrders);
+        setPreparing(filaOrders);
+      })
+      .catch((err) => console.error("Failed to load orders", err));
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   return (
     <>
-      {celebrating && (
-        <ReadyCelebration label={celebrating} onDone={handleCelebrationDone} />
-      )}
+      
 
       {settingsOpen && (
         <div style={{ position: "fixed", inset: 0, zIndex: 10000, display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -114,37 +122,7 @@ export default function QueuePage() {
           fontSize: `${16 * pageFontScale}px`,
         }}
       >
-        <div
-          style={{
-            background: "#111",
-            padding: "14px 40px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-          }}
-        >
-          <span style={{ color: "#fff", fontWeight: 700, fontSize: s(18) }}>
-            Festival Japão — Painel de Fila
-          </span>
-              <button
-            onClick={simulateWebhook}
-            disabled={preparing.length === 0}
-            style={{
-              background: preparing.length === 0 ? "#444" : "#f08918",
-              color: "#fff",
-              border: "none",
-              borderRadius: 8,
-              padding: "10px 24px",
-              fontWeight: 700,
-                fontSize: s(14),
-              cursor: preparing.length === 0 ? "not-allowed" : "pointer",
-              transition: "background 0.2s",
-            }}
-          >
-            ▶ Simular webhook — próximo pronto
-          </button>
-          {/* gear button moved to floating bottom-right */}
-        </div>
+          
 
         <div
           style={{

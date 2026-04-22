@@ -22,9 +22,10 @@ type OrdersCardProps = {
 	order: Order;
 	onCancel?: () => void;
 	onFinish?: () => void;
+	buttonLabel?: string;
 };
 
-export const OrdersCard: React.FC<OrdersCardProps> = ({ order,  onFinish }) => {
+export const OrdersCard: React.FC<OrdersCardProps> = ({ order, onFinish, buttonLabel = "Marcar como Pronto" }) => {
 	const accent = order.prioridade ? '#4caf50' : '#f5a623';
 
 	return (
@@ -133,7 +134,7 @@ export const OrdersCard: React.FC<OrdersCardProps> = ({ order,  onFinish }) => {
 						<svg role="img" aria-label="Ícone de concluído" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width={18} height={18} style={{ display: "inline-block" }}>
 							<path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15l-5-5 1.41-1.41L11 14.17l7.59-7.59L20 8l-9 9z" />
 						</svg>
-						<span>Marcar como Pronto</span>
+						<span>{buttonLabel}</span>
 					</button>
 				</div>
 			</div>
