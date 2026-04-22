@@ -198,7 +198,7 @@ export default function CreateOrdersPage() {
 							Finalizar Pedido
 						</button>
 					</div>
-					<div style={{ textAlign: "center", fontSize: 11, color: "#ccc", marginTop: 12 }}>UM OFERECIMENTO DJ COACH</div>
+					<div style={{ textAlign: "center", fontSize: 11, color: "#ccc", marginTop: 12 }}>DJ COACH COMPANY</div>
 				</div>
 			</div>
 		</div>

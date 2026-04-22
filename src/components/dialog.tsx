@@ -39,7 +39,6 @@ export const Dialog: React.FC<DialogProps> = ({
 	showConfirm = true,
 	showCancel = true,
 }) => {
-	// Close on Escape key
 	useEffect(() => {
 		if (!open) return;
 		const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
