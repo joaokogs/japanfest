@@ -3,17 +3,18 @@ import React from "react";
 
 type OrderStatus = "NOVO" | "RECENTE" | "EM PREPARO";
 
-type OrderItem = {
+export type OrderItem = {
 	name: string;
 	quantity: number;
 	note?: string;
+	image?: string;
 };
 
-type Order = {
+export type Order = {
 	id: number;
 	table?: string;
 	prioridade?: boolean;
-	status: OrderStatus;
+	status?: string;
 	items: OrderItem[];
 };
 
@@ -33,15 +34,15 @@ export const OrdersCard: React.FC<OrdersCardProps> = ({ order,  onFinish }) => {
 				border: `1px solid ${accent}`,
 				borderRadius: 16,
 				background: "#fff",
-				minWidth: 340,
-				maxWidth: 400,
-				margin: 8,
+			width: "100%",
 				boxShadow: "0 2px 16px rgba(0,0,0,0.06)",
 				position: "relative",
 				display: "flex",
 				flexDirection: "column",
 				padding: 0,
-				height: 340,
+				minHeight: 260,
+				height: "100%",
+				boxSizing: "border-box",
 				overflow: "hidden"
 			}}
 		>
@@ -70,11 +71,28 @@ export const OrdersCard: React.FC<OrdersCardProps> = ({ order,  onFinish }) => {
 				</div>
 				<div style={{ marginBottom: 0 }}>
 					{order.items.map((item, idx) => (
-						<div key={idx} style={{ marginBottom: 8 }}>
-							<span style={{ fontWeight: 600, fontSize: 16 }}>{item.quantity}x {item.name}</span>
-							{item.note && (
-								<div style={{ fontSize: 13, color: "#888", marginLeft: 18 }}>{item.note}</div>
-							)}
+						<div key={idx} style={{ marginBottom: 8, display: "flex", alignItems: "center", gap: 12 }}>
+							<img
+								src={item.image ?? `https://placehold.co/160x120?text=${encodeURIComponent(item.name)}`}
+								alt={item.name}
+								loading="lazy"
+								style={{
+									width: 35,
+									height: 35,
+									objectFit: "cover",
+									borderRadius: 8,
+									flex: "none",
+									border: "1px solid #eee",
+									boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
+									background: "#fafafa",
+								}}
+							/>
+							<div>
+								<span style={{ fontWeight: 600, fontSize: 16 }}>{item.quantity}x {item.name}</span>
+								{item.note && (
+									<div style={{ fontSize: 13, color: "#888", marginTop: 4 }}>{item.note}</div>
+								)}
+							</div>
 						</div>
 					))}
 				</div>

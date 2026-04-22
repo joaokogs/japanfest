@@ -6,8 +6,8 @@ type Product = {
 	id: number;
 	name: string;
 	price: number;
-	image: string;
-	priority?: boolean; // true = bebida
+	category?: string;
+	priority?: boolean;
 };
 
 type ProductsCardProps = {
@@ -36,11 +36,10 @@ export const ProductsCard: React.FC<ProductsCardProps> = ({ product, onQuantityC
 	};
 
 	return (
-		<div data-priority={product.priority ? "true" : "false"} className="product-card">
+		<div data-category={product.category ?? ""} className="product-card">
 			<img
-				src={product.image}
+				src={`/api/product/image/${product.id}`}
 				alt={product.name}
-                
 			/>
 			<div className="title">{product.name}</div>
 
@@ -99,20 +98,5 @@ export const ProductsCard: React.FC<ProductsCardProps> = ({ product, onQuantityC
 	);
 };
 
-export const mockProducts: Product[] = [
-	{
-		id: 1,
-		name: "Suco de Amora Natural aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-		price: 16.0,
-		image: "https://placehold.co/400x300?text=Suco+de+Amora",
-		priority: true,
-	},
-	{
-		id: 2,
-		name: "Carne",
-		price: 10.0,
-		image: "https://placehold.co/400x300?text=Água+de+Coco",
-		priority: false,
-	},
-];
+
 
