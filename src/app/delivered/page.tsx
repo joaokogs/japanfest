@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { OrdersCard, Order } from "@/components/ordersCard";
 import Dialog from "@/components/dialog";
+import { toast } from "sonner";
 
 const sortOrders = (arr: Order[]) =>
     [...arr].sort((a, b) => (a.prioridade === b.prioridade ? 0 : a.prioridade ? -1 : 1));
@@ -57,6 +58,7 @@ export default function DeliveredPage() {
                 return;
             }
             setOrders((prev) => sortOrders(prev.filter((o) => o.id !== id)));
+            toast.success(`Pedido #${id} foi entregue!`);
         } catch (err) {
             console.error("Failed to deliver order", err);
         }
@@ -84,7 +86,7 @@ export default function DeliveredPage() {
             <Dialog
                 open={pendingId !== null}
                 onClose={() => setPendingId(null)}
-                onConfirm={() => { if (pendingId !== null) handleDeliver(pendingId); }}
+                onConfirm={() => { if (pendingId !== null) handleDeliver(pendingId).finally(() => setPendingId(null)); }}
                 title="Confirmar entrega"
                 description={`Deseja marcar o pedido #${pendingId} como entregue?`}
                 icon={

@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useEffect, useMemo } from "react";
+import React, { useEffect, useMemo, useRef } from "react";
 
 type ReadyCelebrationProps = {
   label: string;
   onDone: () => void;
+  durationMs?: number;
 };
 
 const BG_COLORS = [
@@ -35,7 +36,9 @@ function randomBetween(a: number, b: number) {
   return a + Math.random() * (b - a);
 }
 
-export const ReadyCelebration: React.FC<ReadyCelebrationProps> = ({ label, onDone }) => {
+export const ReadyCelebration: React.FC<ReadyCelebrationProps> = ({ label, onDone, durationMs = 4000 }) => {
+  const safeDurationMs = Math.min(Math.max(durationMs, 1000), 15000);
+  const onDoneRef = useRef(onDone);
   const bg = useMemo(
     () => BG_COLORS[Math.floor(Math.random() * BG_COLORS.length)],
     [label]
@@ -56,9 +59,13 @@ export const ReadyCelebration: React.FC<ReadyCelebrationProps> = ({ label, onDon
   }, [label]);
 
   useEffect(() => {
-    const timer = setTimeout(onDone, 4000);
+    onDoneRef.current = onDone;
+  }, [onDone]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => onDoneRef.current(), safeDurationMs);
     return () => clearTimeout(timer);
-  }, [label, onDone]);
+  }, [label, safeDurationMs]);
 
   const renderShape = (s: Shape) => {
     const base: React.CSSProperties = {

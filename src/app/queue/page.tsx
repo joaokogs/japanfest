@@ -1,50 +1,205 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import QueueCard from "@/components/queueCard";
+import ReadyCelebration from "@/components/readyCelebration";
+
+type OrderEventPayload = {
+  id?: number | string;
+  status?: string;
+};
+
+const toOrderId = (value: unknown) => String(value ?? "").trim();
+const normalizeStatus = (value: unknown) => String(value ?? "").trim().toLowerCase();
+
+const sortOrderIds = (ids: string[]) =>
+  Array.from(new Set(ids.filter(Boolean))).sort((a, b) => {
+    const aa = Number(a);
+    const bb = Number(b);
+    if (Number.isFinite(aa) && Number.isFinite(bb)) return aa - bb;
+    return a.localeCompare(b);
+  });
+
+const READY_CELEBRATION_TIMEOUT_MS = 5000;
 
 export default function QueuePage() {
   const [ready, setReady] = useState<string[]>([]);
   const [preparing, setPreparing] = useState<string[]>([]);
+  const [readyCelebrationQueue, setReadyCelebrationQueue] = useState<string[]>([]);
+  const [activeCelebration, setActiveCelebration] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [cardSize, setCardSize] = useState<number>(140);
   const [pageFontScale, setPageFontScale] = useState<number>(1);
   const s = (n: number) => `${Math.round(n * pageFontScale)}px`;
+  const readyRef = useRef<string[]>([]);
+  const activeCelebrationRef = useRef<string | null>(null);
+  const readyCelebrationQueueRef = useRef<string[]>([]);
+
+  const enqueueReadyCelebration = (orderId: string) => {
+    setReadyCelebrationQueue((prev) => {
+      if (prev.includes(orderId)) return prev;
+      if (activeCelebrationRef.current === orderId) return prev;
+      if (readyRef.current.includes(orderId)) return prev;
+      return [...prev, orderId];
+    });
+  };
+
+  useEffect(() => {
+    readyRef.current = ready;
+  }, [ready]);
+
+  useEffect(() => {
+    activeCelebrationRef.current = activeCelebration;
+  }, [activeCelebration]);
+
+  useEffect(() => {
+    readyCelebrationQueueRef.current = readyCelebrationQueue;
+  }, [readyCelebrationQueue]);
 
   useEffect(() => {
     let mounted = true;
-    fetch("/api/orders")
-      .then(async (r) => {
+    const fetchOrders = async () => {
+      try {
+        const r = await fetch("/api/orders");
         if (!r.ok) {
           const txt = await r.text().catch(() => "<no body>");
           console.error(`Failed to fetch /api/orders. HTTP ${r.status}`, txt);
-          return [];
+          return null;
         }
         const ct = (r.headers.get("content-type") || "").toLowerCase();
-        if (ct.includes("application/json")) return r.json();
-        const text = await r.text().catch(() => "<unreadable>");
-        console.error("/api/orders returned non-JSON:", text);
-        return [];
-      })
-      .then((data: any[]) => {
-        if (!mounted) return;
-        const readyOrders = (data || [])
+        if (!ct.includes("application/json")) {
+          const text = await r.text().catch(() => "<unreadable>");
+          console.error("/api/orders returned non-JSON:", text);
+          return null;
+        }
+        const data: any[] = await r.json();
+        return data || [];
+      } catch (err) {
+        console.error("Failed to load orders", err);
+        return null;
+      }
+    };
+
+    const applyOrders = (data: any[], triggerCelebration: boolean) => {
+      const nextReady = sortOrderIds(
+        (data || [])
           .filter((o: any) => o.status === "Pronto")
-          .map((o: any) => String(o.id));
-        const filaOrders = (data || [])
+          .map((o: any) => String(o.id)),
+      );
+      const nextPreparing = sortOrderIds(
+        (data || [])
           .filter((o: any) => o.status === "Fila")
-          .map((o: any) => String(o.id));
-        setReady(readyOrders);
-        setPreparing(filaOrders);
-      })
-      .catch((err) => console.error("Failed to load orders", err));
+          .map((o: any) => String(o.id)),
+      );
+
+      const pendingReady = new Set<string>(readyCelebrationQueueRef.current);
+      if (activeCelebrationRef.current) pendingReady.add(activeCelebrationRef.current);
+
+      if (triggerCelebration) {
+        const previousReady = new Set<string>(readyRef.current);
+        nextReady.forEach((id) => {
+          if (!previousReady.has(id) && !pendingReady.has(id)) {
+            enqueueReadyCelebration(id);
+            pendingReady.add(id);
+          }
+        });
+      }
+
+      setReady(sortOrderIds(nextReady.filter((id) => !pendingReady.has(id))));
+      setPreparing(sortOrderIds(nextPreparing.filter((id) => !pendingReady.has(id))));
+    };
+
+    const loadInitial = async () => {
+      const data = await fetchOrders();
+      if (!mounted || !data) return;
+      applyOrders(data, false);
+    };
+
+    const refreshWithFallback = async () => {
+      const data = await fetchOrders();
+      if (!mounted || !data) return;
+      applyOrders(data, true);
+    };
+
+    loadInitial();
+    const intervalId = window.setInterval(() => {
+      void refreshWithFallback();
+    }, 3000);
+
     return () => {
       mounted = false;
+      window.clearInterval(intervalId);
     };
   }, []);
 
+  useEffect(() => {
+    const source = new EventSource("/api/events/orders");
+
+    source.onmessage = (event) => {
+      let payload: OrderEventPayload | null = null;
+      try {
+        payload = JSON.parse(event.data);
+      } catch {
+        return;
+      }
+
+      const orderId = toOrderId(payload?.id);
+      const status = normalizeStatus(payload?.status);
+      if (!orderId || !status) return;
+
+      if (status === "pronto") {
+        enqueueReadyCelebration(orderId);
+        return;
+      }
+
+      if (status === "fila" || status === "em preparo" || status === "preparando") {
+        setReadyCelebrationQueue((prev) => prev.filter((id) => id !== orderId));
+        if (activeCelebrationRef.current === orderId) setActiveCelebration(null);
+        setReady((prev) => prev.filter((id) => id !== orderId));
+        setPreparing((prev) => sortOrderIds([...prev, orderId]));
+        return;
+      }
+
+      if (status === "entregue" || status === "cancelado") {
+        setReadyCelebrationQueue((prev) => prev.filter((id) => id !== orderId));
+        if (activeCelebrationRef.current === orderId) setActiveCelebration(null);
+        setReady((prev) => prev.filter((id) => id !== orderId));
+        setPreparing((prev) => prev.filter((id) => id !== orderId));
+      }
+    };
+
+    source.onerror = (error) => {
+      console.error("SSE /events/orders error", error);
+    };
+
+    return () => {
+      source.close();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (activeCelebration || readyCelebrationQueue.length === 0) return;
+    setActiveCelebration(readyCelebrationQueue[0]);
+  }, [activeCelebration, readyCelebrationQueue]);
+
+  const handleCelebrationDone = () => {
+    if (!activeCelebration) return;
+    const finishedId = activeCelebration;
+    setActiveCelebration(null);
+    setReadyCelebrationQueue((prev) => prev.filter((id) => id !== finishedId));
+    setPreparing((prev) => prev.filter((id) => id !== finishedId));
+    setReady((prev) => sortOrderIds([...prev, finishedId]));
+  };
+
   return (
     <>
+      {activeCelebration && (
+        <ReadyCelebration
+          label={activeCelebration}
+          onDone={handleCelebrationDone}
+          durationMs={READY_CELEBRATION_TIMEOUT_MS}
+        />
+      )}
       
 
       {settingsOpen && (

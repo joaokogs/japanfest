@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { ProductsCard } from "@/components/productsCard";
+import { toast } from "sonner";
 import "./create-orders.css";
 
 type Product = {
@@ -12,44 +13,107 @@ type Product = {
 	priority: boolean;
 };
 
-type Filter = "todos" | "comida" | "bebida";
+const ALL_FILTER = "todos";
 
-type PaymentMethod = "Cartão de Debito" | "Cartão de Crédito" | "Pix" | "Dinheiro";
+const normalizeCategory = (value: string) => value.trim().toLowerCase();
+
+const toCategoryLabel = (value: string) => value.charAt(0).toUpperCase() + value.slice(1);
+
+const extractCategoryName = (item: unknown) => {
+	if (typeof item === "string") return item;
+	if (item && typeof item === "object") {
+		const categoryObject = item as { name?: unknown; category?: unknown; label?: unknown; title?: unknown };
+		const raw = categoryObject.name ?? categoryObject.category ?? categoryObject.label ?? categoryObject.title;
+		return typeof raw === "string" ? raw : "";
+	}
+	return "";
+};
+
+const extractCategories = (payload: unknown): string[] => {
+	const list = Array.isArray(payload)
+		? payload
+		: payload && typeof payload === "object" && Array.isArray((payload as { categories?: unknown }).categories)
+			? ((payload as { categories: unknown[] }).categories ?? [])
+			: [];
+	const unique = new Map<string, string>();
+	for (const item of list) {
+		const name = extractCategoryName(item).trim();
+		if (!name) continue;
+		const normalized = normalizeCategory(name);
+		if (!unique.has(normalized)) unique.set(normalized, name);
+	}
+	return Array.from(unique.values());
+};
+
+type PaymentMethod = "Cart\u00E3o de D\u00E9bito" | "Cart\u00E3o de Cr\u00E9dito" | "Pix" | "Dinheiro";
 
 const PAYMENT_OPTIONS: { key: PaymentMethod; icon: string }[] = [
-	{ key: "Cartão de Crédito", icon: "💳" },
-	{ key: "Cartão de Debito", icon: "🏧" },
-	{ key: "Pix", icon: "📱" },
-	{ key: "Dinheiro", icon: "💵" },
+	{ key: "Cart\u00E3o de Cr\u00E9dito", icon: "\uD83D\uDCB3" },
+	{ key: "Cart\u00E3o de D\u00E9bito", icon: "\uD83C\uDFE7" },
+	{ key: "Pix", icon: "\uD83D\uDCF1" },
+	{ key: "Dinheiro", icon: "\uD83D\uDCB5" },
 ];
 
 export default function CreateOrdersPage() {
-	const [filter, setFilter] = useState<Filter>("todos");
+	const [filter, setFilter] = useState<string>(ALL_FILTER);
+	const [categories, setCategories] = useState<string[]>([]);
 	const [quantities, setQuantities] = useState<Record<number, number>>({});
 	const [products, setProducts] = useState<Product[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [showPaymentModal, setShowPaymentModal] = useState(false);
 	const [selectedPayment, setSelectedPayment] = useState<PaymentMethod | null>(null);
 	const [submitting, setSubmitting] = useState(false);
-	const [toast, setToast] = useState<{ orderId: number } | null>(null);
 	const [orderError, setOrderError] = useState<string | null>(null);
 
 	useEffect(() => {
-		fetch("/api/products")
-			.then((res) => res.json())
-			.then((data: Product[]) => setProducts(data))
-			.finally(() => setLoading(false));
+		let isMounted = true;
+		const loadData = async () => {
+			try {
+				const [productsRes, categoriesRes] = await Promise.all([
+					fetch("/api/products"),
+					fetch("/api/products/categories"),
+				]);
+
+				const productsData: Product[] = productsRes.ok ? await productsRes.json() : [];
+				const categoriesPayload: unknown = categoriesRes.ok ? await categoriesRes.json() : [];
+				const categoryFromApi = extractCategories(categoriesPayload);
+				const fallbackCategories = Array.from(
+					new Set(
+						productsData
+							.map((product) => product.category?.trim())
+							.filter((category): category is string => Boolean(category)),
+					),
+				);
+				const resolvedCategories = (categoryFromApi.length > 0 ? categoryFromApi : fallbackCategories).filter(
+					(category) => normalizeCategory(category) !== ALL_FILTER,
+				);
+
+				if (!isMounted) return;
+				setProducts(productsData);
+				setCategories(resolvedCategories);
+			} catch (error) {
+				console.error("Erro ao carregar produtos/categorias", error);
+				if (!isMounted) return;
+				setProducts([]);
+				setCategories([]);
+			} finally {
+				if (isMounted) setLoading(false);
+			}
+		};
+
+		loadData();
+		return () => {
+			isMounted = false;
+		};
 	}, []);
 
 	const handleQuantityChange = (id: number, quantity: number) => {
 		setQuantities((prev) => ({ ...prev, [id]: quantity }));
 	};
 
-	const filteredProducts = products.filter((p) => {
-		if (filter === "comida") return !p.priority;
-		if (filter === "bebida") return p.priority;
-		return true;
-	});
+	const filteredProducts = products.filter(
+		(product) => filter === ALL_FILTER || normalizeCategory(product.category ?? "") === normalizeCategory(filter),
+	);
 
 	const subtotal = products.reduce((sum, p) => sum + (quantities[p.id] ?? 0) * p.price, 0);
 
@@ -88,20 +152,20 @@ export default function CreateOrdersPage() {
 			setQuantities({});
 			setShowPaymentModal(false);
 			setSelectedPayment(null);
-			setToast({ orderId: data.id });
-			setTimeout(() => setToast(null), 5000);
+			toast.success(`Pedido #${data.id} enviado!`, {
+				description: "Seu pedido j\u00E1 est\u00E1 sendo preparado.",
+			});
 		} catch (err) {
-			setOrderError("Não foi possível conectar ao servidor.");
+			setOrderError("N\u00E3o foi poss\u00EDvel conectar ao servidor.");
 			console.error(err);
 		} finally {
 			setSubmitting(false);
 		}
 	};
 
-	const filterLabels: { key: Filter; label: string }[] = [
-		{ key: "todos", label: "Todos" },
-		{ key: "comida", label: "Comidas" },
-		{ key: "bebida", label: "Bebidas" },
+	const filterLabels: { key: string; label: string }[] = [
+		{ key: ALL_FILTER, label: "Todos" },
+		...categories.map((category) => ({ key: category, label: toCategoryLabel(category) })),
 	];
 
 	if (loading) return <div style={{ padding: 40, textAlign: "center", color: "#888" }}>Carregando produtos...</div>;
@@ -257,13 +321,6 @@ export default function CreateOrdersPage() {
 			</div>
 		)}
 
-		{/* Success Toast */}
-		{toast && (
-			<div style={{ position: "fixed", bottom: 32, right: 32, zIndex: 200, background: "#fff", borderRadius: 14, boxShadow: "0 8px 32px rgba(0,0,0,0.18)", padding: "20px 24px", minWidth: 280, borderLeft: "5px solid #2e8b57", display: "flex", flexDirection: "column", gap: 4 }}>
-				<span style={{ fontWeight: 700, fontSize: 15, color: "#222" }}>✅ Pedido #{toast.orderId} enviado!</span>
-				<span style={{ fontSize: 13, color: "#666" }}>Seu pedido já está sendo preparado.</span>
-			</div>
-		)}
 		</>
 	);
 }
