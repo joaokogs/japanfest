@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { OFFLINE_FALLBACK_IMAGE } from "@/lib/offlineStore";
 
 type Product = {
 	id: number;
@@ -8,6 +9,7 @@ type Product = {
 	price: number;
 	category?: string;
 	priority?: boolean;
+	image?: string;
 };
 
 type ProductsCardProps = {
@@ -37,10 +39,7 @@ export const ProductsCard: React.FC<ProductsCardProps> = ({ product, onQuantityC
 
 	return (
 		<div data-category={product.category ?? ""} className="product-card">
-			<img
-				src={`/api/product/image/${product.id}`}
-				alt={product.name}
-			/>
+			<img src={product.image ?? OFFLINE_FALLBACK_IMAGE} alt={product.name} />
 			<div className="title">{product.name}</div>
 
 			<div className="footer">
@@ -65,7 +64,7 @@ export const ProductsCard: React.FC<ProductsCardProps> = ({ product, onQuantityC
 							}}
 							aria-label="Diminuir quantidade"
 						>
-							−
+							-
 						</button>
 						<span style={{ fontWeight: 600, fontSize: 15, minWidth: 28, textAlign: "center", color: "#222" }}>
 							{quantity}
@@ -97,6 +96,3 @@ export const ProductsCard: React.FC<ProductsCardProps> = ({ product, onQuantityC
 		</div>
 	);
 };
-
-
-

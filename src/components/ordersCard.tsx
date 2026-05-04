@@ -1,5 +1,6 @@
 
 import React from "react";
+import { OFFLINE_FALLBACK_IMAGE } from "@/lib/offlineStore";
 
 type OrderStatus = "NOVO" | "RECENTE" | "EM PREPARO";
 
@@ -74,7 +75,7 @@ export const OrdersCard: React.FC<OrdersCardProps> = ({ order, onFinish, buttonL
 					{order.items.map((item, idx) => (
 						<div key={idx} style={{ marginBottom: 8, display: "flex", alignItems: "center", gap: 12 }}>
 							<img
-								src={item.image ?? `https://placehold.co/160x120?text=${encodeURIComponent(item.name)}`}
+								src={item.image ?? OFFLINE_FALLBACK_IMAGE}
 								alt={item.name}
 								loading="lazy"
 								style={{
