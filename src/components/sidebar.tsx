@@ -10,7 +10,7 @@ type NavItem = {
 };
 
 const NAV_ITEMS: NavItem[] = [
-  { href: "/", label: "Inicio" },
+  { href: "/inicio", label: "Inicio" },
   { href: "/create-orders", label: "Criar Pedidos" },
   { href: "/orders", label: "Pedidos" },
   { href: "/delivered", label: "Entregues" },
