@@ -38,7 +38,7 @@ export const ProductsCard: React.FC<ProductsCardProps> = ({ product, onQuantityC
 	return (
 		<div data-category={product.category ?? ""} className="product-card">
 			<img
-				src={`/api/product/image/${product.id}`}
+				src={`/api/products/${product.id}/image`}
 				alt={product.name}
 			/>
 			<div className="title">{product.name}</div>

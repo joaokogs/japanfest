@@ -133,15 +133,23 @@ export default function CreateOrdersPage() {
 				quantity: quantities[p.id],
 				unit_price: p.price,
 			}));
-			const res = await fetch("/api/order", {
+			const payload = {
+				list_items: listItems,
+				payment_method: selectedPayment,
+				total_price: total,
+			};
+			let res = await fetch("/api/orders", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({
-					list_items: listItems,
-					payment_method: selectedPayment,
-					total_price: total,
-				}),
+				body: JSON.stringify(payload),
 			});
+			if (res.status === 404) {
+				res = await fetch("/api/order", {
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify(payload),
+				});
+			}
 			if (!res.ok) {
 				const body = await res.text();
 				console.error("API error", res.status, body);

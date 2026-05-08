@@ -8,6 +8,47 @@ import { toast } from "sonner";
 const sortOrders = (arr: Order[]) =>
     [...arr].sort((a, b) => (a.prioridade === b.prioridade ? 0 : a.prioridade ? -1 : 1));
 
+const mapOrderItems = (order: any, nameToId: Map<string, number>) => {
+    const source = Array.isArray(order?.items)
+        ? order.items
+        : Array.isArray(order?.products)
+            ? order.products
+            : [];
+
+    return source
+        .map((item: any, index: number) => {
+            if (typeof item === "string") {
+                const id = nameToId.get(String(item).toLowerCase());
+                return {
+                    name: item,
+                    quantity: 1,
+                    image: id ? `/api/products/${id}/image` : undefined,
+                } as any;
+            }
+
+            if (!item || typeof item !== "object") return null;
+
+            const rawName = item.name ?? item.product_name ?? item.title;
+            const name = String(rawName ?? "").trim();
+            const quantityValue = Number(item.quantity);
+            const quantity = Number.isFinite(quantityValue) && quantityValue > 0 ? quantityValue : 1;
+            const productIdValue = Number(item.product_id ?? item.id);
+            const fromProductId = Number.isFinite(productIdValue) && productIdValue > 0 ? productIdValue : undefined;
+            const fromName = name ? nameToId.get(name.toLowerCase()) : undefined;
+            const productId = fromProductId ?? fromName;
+            const note = typeof item.note === "string" ? item.note : typeof item.observation === "string" ? item.observation : undefined;
+            const safeName = name || (fromProductId ? `Item #${fromProductId}` : `Item ${index + 1}`);
+
+            return {
+                name: safeName,
+                quantity,
+                note,
+                image: productId ? `/api/products/${productId}/image` : undefined,
+            } as any;
+        })
+        .filter(Boolean) as any[];
+};
+
 export default function DeliveredPage() {
     const [orders, setOrders] = useState<Order[]>([]);
     const [loading, setLoading] = useState(true);
@@ -17,7 +58,7 @@ export default function DeliveredPage() {
         let mounted = true;
         Promise.all([
             fetch("/api/products").then((r) => r.ok ? r.json() : []).catch(() => []),
-            fetch("/api/orders/items").then((r) => r.ok ? r.json() : []).catch(() => []),
+            fetch("/api/orders?include=items&status=Pronto&sort=id&order=asc").then((r) => r.ok ? r.json() : []).catch(() => []),
         ])
             .then(([productsData, ordersData]: any[]) => {
                 const nameToId = new Map<string, number>();
@@ -26,19 +67,11 @@ export default function DeliveredPage() {
                 });
 
                 const mapped: Order[] = (ordersData || [])
-                    .filter((o: any) => o.status === "Pronto")
                     .map((o: any) => ({
                         id: o.id,
                         prioridade: !!o.priority,
                         status: o.status,
-                        items: (o.products || []).map((name: string) => {
-                            const id = nameToId.get(String(name).toLowerCase());
-                            return {
-                                name,
-                                quantity: 1,
-                                image: id ? `/api/product/image/${id}` : undefined,
-                            } as any;
-                        }),
+                        items: mapOrderItems(o, nameToId),
                     }));
 
                 if (mounted) setOrders(sortOrders(mapped));
@@ -50,7 +83,10 @@ export default function DeliveredPage() {
 
     const handleDeliver = async (id: number) => {
         try {
-            const res = await fetch(`/api/order/${id}/Entregue`, { method: "PATCH" });
+            let res = await fetch(`/api/orders/${id}/Entregue`, { method: "PATCH" });
+            if (res.status === 404) {
+                res = await fetch(`/api/order/${id}/Entregue`, { method: "PATCH" });
+            }
             if (!res.ok) {
                 let body = "";
                 try { body = await res.text(); } catch { body = "<unreadable>"; }

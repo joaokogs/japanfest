@@ -60,7 +60,7 @@ export default function QueuePage() {
     let mounted = true;
     const fetchOrders = async () => {
       try {
-        const r = await fetch("/api/orders");
+        const r = await fetch("/api/orders?sort=id&status=Fila&status=Pronto&order=asc");
         if (!r.ok) {
           const txt = await r.text().catch(() => "<no body>");
           console.error(`Failed to fetch /api/orders. HTTP ${r.status}`, txt);
