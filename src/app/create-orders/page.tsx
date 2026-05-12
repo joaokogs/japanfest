@@ -54,6 +54,29 @@ const PAYMENT_OPTIONS: { key: PaymentMethod; icon: string }[] = [
 	{ key: "Dinheiro", icon: "\uD83D\uDCB5" },
 ];
 
+const formatCurrency = (value: number) => `R$ ${value.toFixed(2).replace(".", ",")}`;
+
+const parseCurrencyInput = (value: string) => {
+	const cleaned = value.replace(/[^\d.,-]/g, "").trim();
+	if (!cleaned) return 0;
+
+	const lastComma = cleaned.lastIndexOf(",");
+	const lastDot = cleaned.lastIndexOf(".");
+	const decimalSeparator = lastComma > lastDot ? "," : lastDot > lastComma ? "." : null;
+
+	let normalized = cleaned;
+	if (decimalSeparator === ",") {
+		normalized = cleaned.replace(/\./g, "").replace(",", ".");
+	} else if (decimalSeparator === ".") {
+		normalized = cleaned.replace(/,/g, "");
+	} else {
+		normalized = cleaned.replace(/[.,]/g, "");
+	}
+
+	const parsed = Number(normalized);
+	return Number.isFinite(parsed) ? parsed : 0;
+};
+
 export default function CreateOrdersPage() {
 	const [filter, setFilter] = useState<string>(ALL_FILTER);
 	const [categories, setCategories] = useState<string[]>([]);
@@ -62,6 +85,9 @@ export default function CreateOrdersPage() {
 	const [loading, setLoading] = useState(true);
 	const [showPaymentModal, setShowPaymentModal] = useState(false);
 	const [selectedPayment, setSelectedPayment] = useState<PaymentMethod | null>(null);
+	const [showCashDialog, setShowCashDialog] = useState(false);
+	const [cashReceived, setCashReceived] = useState("");
+	const [cashError, setCashError] = useState<string | null>(null);
 	const [submitting, setSubmitting] = useState(false);
 	const [orderError, setOrderError] = useState<string | null>(null);
 
@@ -120,8 +146,20 @@ export default function CreateOrdersPage() {
 	const orderItems = products.filter((p) => (quantities[p.id] ?? 0) > 0);
 
 	const total = Number(subtotal.toFixed(2));
+	const cashReceivedAmount = parseCurrencyInput(cashReceived);
+	const cashChange = Math.max(cashReceivedAmount - total, 0);
+	const missingAmount = Math.max(total - cashReceivedAmount, 0);
 
 	const totalItemsCount = Object.values(quantities).reduce((s, v) => s + (v ?? 0), 0);
+
+	const closePaymentFlow = () => {
+		setShowPaymentModal(false);
+		setShowCashDialog(false);
+		setSelectedPayment(null);
+		setCashReceived("");
+		setCashError(null);
+		setOrderError(null);
+	};
 
 	const handleSubmitOrder = async () => {
 		if (!selectedPayment) return;
@@ -158,8 +196,7 @@ export default function CreateOrdersPage() {
 			}
 			const data = await res.json();
 			setQuantities({});
-			setShowPaymentModal(false);
-			setSelectedPayment(null);
+			closePaymentFlow();
 			toast.success(`Pedido #${data.id} enviado!`, {
 				description: "Seu pedido j\u00E1 est\u00E1 sendo preparado.",
 			});
@@ -169,6 +206,25 @@ export default function CreateOrdersPage() {
 		} finally {
 			setSubmitting(false);
 		}
+	};
+
+	const handleConfirmPayment = () => {
+		if (!selectedPayment || submitting) return;
+		if (selectedPayment === "Dinheiro") {
+			setShowCashDialog(true);
+			setCashError(null);
+			return;
+		}
+		handleSubmitOrder();
+	};
+
+	const handleConfirmCashPayment = () => {
+		if (cashReceivedAmount < total) {
+			setCashError("O valor recebido deve ser igual ou maior que o total do pedido.");
+			return;
+		}
+		setCashError(null);
+		handleSubmitOrder();
 	};
 
 	const filterLabels: { key: string; label: string }[] = [
@@ -253,6 +309,7 @@ export default function CreateOrdersPage() {
 						<button
 							onClick={() => {
 								if (total <= 0) return;
+								setOrderError(null);
 								setShowPaymentModal(true);
 							}}
 							style={{
@@ -279,7 +336,7 @@ export default function CreateOrdersPage() {
 		{showPaymentModal && (
 			<div
 				style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center" }}
-				onClick={(e) => { if (e.target === e.currentTarget) { setShowPaymentModal(false); setSelectedPayment(null); } }}
+				onClick={(e) => { if (e.target === e.currentTarget) closePaymentFlow(); }}
 			>
 				<div style={{ background: "#fff", borderRadius: 16, padding: 32, width: 380, maxWidth: "90vw", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
 					<h2 style={{ margin: "0 0 8px", fontSize: 20, fontWeight: 700, color: "#222" }}>Forma de Pagamento</h2>
@@ -288,7 +345,13 @@ export default function CreateOrdersPage() {
 						{PAYMENT_OPTIONS.map(({ key, icon }) => (
 							<button
 								key={key}
-								onClick={() => setSelectedPayment(key)}
+								onClick={() => {
+									setSelectedPayment(key);
+									if (key !== "Dinheiro") {
+										setShowCashDialog(false);
+										setCashError(null);
+									}
+								}}
 								style={{
 									borderRadius: 12,
 									border: selectedPayment === key ? "2.5px solid #f08918" : "2px solid #e8e8e8",
@@ -312,15 +375,103 @@ export default function CreateOrdersPage() {
 					)}
 					<div style={{ display: "flex", gap: 10 }}>
 						<button
-							onClick={() => { setShowPaymentModal(false); setSelectedPayment(null); }}
+							onClick={closePaymentFlow}
 							style={{ flex: 1, padding: "11px 0", borderRadius: 8, border: "1px solid #e0e0e0", background: "#f5f5f5", fontWeight: 600, fontSize: 14, cursor: "pointer", color: "#555" }}
 						>
 							Cancelar
 						</button>
 						<button
-							onClick={handleSubmitOrder}
+							onClick={handleConfirmPayment}
 							disabled={!selectedPayment || submitting}
 							style={{ flex: 2, padding: "11px 0", borderRadius: 8, border: "none", background: selectedPayment && !submitting ? "#f08918" : "#e6e6e6", color: selectedPayment && !submitting ? "#fff" : "#999", fontWeight: 700, fontSize: 14, cursor: selectedPayment && !submitting ? "pointer" : "default" }}
+						>
+							{submitting ? "Enviando..." : "Confirmar Pedido"}
+						</button>
+					</div>
+				</div>
+			</div>
+		)}
+
+		{showPaymentModal && showCashDialog && selectedPayment === "Dinheiro" && (
+			<div
+				style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", zIndex: 110, display: "flex", alignItems: "center", justifyContent: "center" }}
+				onClick={(e) => {
+					if (e.target === e.currentTarget) {
+						setShowCashDialog(false);
+						setCashError(null);
+					}
+				}}
+			>
+				<div style={{ background: "#fff", borderRadius: 16, padding: 28, width: 420, maxWidth: "92vw", boxShadow: "0 20px 60px rgba(0,0,0,0.18)" }}>
+					<h3 style={{ margin: "0 0 6px", fontSize: 20, fontWeight: 700, color: "#222" }}>Pagamento em Dinheiro</h3>
+					<p style={{ margin: "0 0 18px", fontSize: 13, color: "#666" }}>
+						Total do pedido: <strong style={{ color: "#f08918" }}>{formatCurrency(total)}</strong>
+					</p>
+
+					<label htmlFor="cash-received" style={{ display: "block", marginBottom: 6, fontSize: 13, fontWeight: 600, color: "#444" }}>
+						Valor entregue
+					</label>
+					<input
+						id="cash-received"
+						type="text"
+						inputMode="decimal"
+						placeholder="Ex: 100,00"
+						value={cashReceived}
+						onChange={(e) => {
+							setCashReceived(e.target.value);
+							setCashError(null);
+						}}
+						style={{
+							color: "#222",
+							width: "100%",
+							height: 44,
+							borderRadius: 10,
+							border: "1px solid #ddd",
+							padding: "0 12px",
+							fontSize: 15,
+							outline: "none",
+							marginBottom: 12,
+						}}
+					/>
+
+					{cashReceived.trim() && (
+						<div
+							style={{
+								marginBottom: 14,
+								padding: "10px 12px",
+								borderRadius: 8,
+								background: cashReceivedAmount >= total ? "#effaf3" : "#fff5eb",
+								color: cashReceivedAmount >= total ? "#2e8b57" : "#b25b00",
+								fontSize: 14,
+								fontWeight: 600,
+							}}
+						>
+							{cashReceivedAmount >= total
+								? `Troco: ${formatCurrency(cashChange)}`
+								: `Falta: ${formatCurrency(missingAmount)}`}
+						</div>
+					)}
+
+					{cashError && (
+						<p style={{ margin: "0 0 12px", fontSize: 13, color: "#c0392b", background: "#fdf0ed", borderRadius: 8, padding: "10px 12px" }}>
+							{cashError}
+						</p>
+					)}
+
+					<div style={{ display: "flex", gap: 10 }}>
+						<button
+							onClick={() => {
+								setShowCashDialog(false);
+								setCashError(null);
+							}}
+							style={{ flex: 1, padding: "11px 0", borderRadius: 8, border: "1px solid #e0e0e0", background: "#f5f5f5", fontWeight: 600, fontSize: 14, cursor: "pointer", color: "#555" }}
+						>
+							Voltar
+						</button>
+						<button
+							onClick={handleConfirmCashPayment}
+							disabled={submitting}
+							style={{ flex: 2, padding: "11px 0", borderRadius: 8, border: "none", background: !submitting ? "#f08918" : "#e6e6e6", color: !submitting ? "#fff" : "#999", fontWeight: 700, fontSize: 14, cursor: !submitting ? "pointer" : "default" }}
 						>
 							{submitting ? "Enviando..." : "Confirmar Pedido"}
 						</button>
