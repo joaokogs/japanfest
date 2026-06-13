@@ -3,11 +3,17 @@ import React from "react";
 
 type OrderStatus = "NOVO" | "RECENTE" | "EM PREPARO";
 
+export type Customization = {
+	id: number;
+	description: string;
+};
+
 export type OrderItem = {
 	name: string;
 	quantity: number;
 	note?: string;
 	image?: string;
+	customizations?: Customization[];
 };
 
 export type Order = {
@@ -27,7 +33,6 @@ type OrdersCardProps = {
 
 export const OrdersCard: React.FC<OrdersCardProps> = ({ order, onFinish, buttonLabel = "Marcar como Pronto" }) => {
 	const accent = order.prioridade ? '#4caf50' : '#f5a623';
-
 	return (
 		<div
 			style={{
@@ -92,6 +97,11 @@ export const OrdersCard: React.FC<OrdersCardProps> = ({ order, onFinish, buttonL
 								<span style={{ fontWeight: 600, fontSize: 16 }}>{item.quantity}x {item.name}</span>
 								{item.note && (
 									<div style={{ fontSize: 13, color: "#888", marginTop: 4 }}>{item.note}</div>
+								)}
+								{item.customizations && item.customizations.length > 0 && (
+									<div style={{ fontSize: 12, color: "#888", marginTop: 2, fontStyle: "italic" }}>
+										{item.customizations.map((c) => c.description).join(", ")}
+									</div>
 								)}
 							</div>
 						</div>

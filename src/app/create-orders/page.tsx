@@ -11,6 +11,16 @@ type Product = {
 	price: number;
 	category: string;
 	priority: boolean;
+	customizable?: boolean;
+};
+
+type CartEntry = {
+	key: string;
+	productId: number;
+	quantity: number;
+	unitPrice: number;
+	customizationIds: number[];
+	customizationDescs: string[];
 };
 
 const ALL_FILTER = "todos";
@@ -80,7 +90,7 @@ const parseCurrencyInput = (value: string) => {
 export default function CreateOrdersPage() {
 	const [filter, setFilter] = useState<string>(ALL_FILTER);
 	const [categories, setCategories] = useState<string[]>([]);
-	const [quantities, setQuantities] = useState<Record<number, number>>({});
+	const [cartEntries, setCartEntries] = useState<CartEntry[]>([]);
 	const [products, setProducts] = useState<Product[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -90,6 +100,8 @@ export default function CreateOrdersPage() {
 	const [cashError, setCashError] = useState<string | null>(null);
 	const [submitting, setSubmitting] = useState(false);
 	const [orderError, setOrderError] = useState<string | null>(null);
+	const [showRemoveModal, setShowRemoveModal] = useState(false);
+	const [removeProductId, setRemoveProductId] = useState<number | null>(null);
 
 	useEffect(() => {
 		let isMounted = true;
@@ -133,24 +145,108 @@ export default function CreateOrdersPage() {
 		};
 	}, []);
 
-	const handleQuantityChange = (id: number, quantity: number) => {
-		setQuantities((prev) => ({ ...prev, [id]: quantity }));
+	// Derive quantities from cartEntries for ProductsCard display
+	const quantities: Record<number, number> = {};
+	for (const entry of cartEntries) {
+		quantities[entry.productId] = (quantities[entry.productId] ?? 0) + entry.quantity;
+	}
+
+	const makeCartKey = (productId: number, customizationIds: number[]) => {
+		const sorted = [...customizationIds].sort((a, b) => a - b);
+		return `${productId}:${sorted.join(",")}`;
+	};
+
+	const handleQuantityChange = (id: number, newQuantity: number) => {
+		setCartEntries((prev) => {
+			const items = prev.filter((e) => e.productId === id);
+			const total = items.reduce((s, e) => s + e.quantity, 0);
+			if (newQuantity > total) {
+				// Increment for non-customizable products
+				const product = products.find((p) => p.id === id);
+				if (!product || product.customizable) return prev;
+				const key = makeCartKey(id, []);
+				const existing = prev.find((e) => e.key === key);
+				if (existing) {
+					return prev.map((e) =>
+						e.key === key ? { ...e, quantity: e.quantity + (newQuantity - total) } : e,
+					);
+				}
+				return [...prev, { key, productId: id, quantity: newQuantity - total, unitPrice: product.price, customizationIds: [], customizationDescs: [] }];
+			}
+			if (newQuantity < total) {
+				let toRemove = total - newQuantity;
+				const updated = [...prev];
+				for (let i = updated.length - 1; i >= 0 && toRemove > 0; i--) {
+					if (updated[i].productId === id) {
+						const removed = Math.min(updated[i].quantity, toRemove);
+						updated[i] = { ...updated[i], quantity: updated[i].quantity - removed };
+						toRemove -= removed;
+						if (updated[i].quantity <= 0) updated.splice(i, 1);
+					}
+				}
+				return updated;
+			}
+			return prev;
+		});
+	};
+
+	const handleAddWithCustomizations = (productId: number, customizationIds: number[], customizationDescs: string[]) => {
+		setCartEntries((prev) => {
+			const product = products.find((p) => p.id === productId);
+			if (!product) return prev;
+			const key = makeCartKey(productId, customizationIds);
+			const existing = prev.find((e) => e.key === key);
+			if (existing) {
+				return prev.map((e) =>
+					e.key === key ? { ...e, quantity: e.quantity + 1 } : e,
+				);
+			}
+			return [...prev, { key, productId, quantity: 1, unitPrice: product.price, customizationIds, customizationDescs }];
+		});
+	};
+
+	// Remove modal handlers
+	useEffect(() => {
+		if (!showRemoveModal) return;
+		const handler = (e: KeyboardEvent) => {
+			if (e.key === "Escape") handleCancelRemove();
+		};
+		document.addEventListener("keydown", handler);
+		return () => document.removeEventListener("keydown", handler);
+	}, [showRemoveModal]);
+
+	const handleRemoveWithCustomizations = (productId: number) => {
+		setRemoveProductId(productId);
+		setShowRemoveModal(true);
+	};
+
+	const handleConfirmRemove = (entryKey: string) => {
+		setCartEntries((prev) =>
+			prev
+				.map((e) => (e.key === entryKey ? { ...e, quantity: e.quantity - 1 } : e))
+				.filter((e) => e.quantity > 0),
+		);
+		setShowRemoveModal(false);
+		setRemoveProductId(null);
+	};
+
+	const handleCancelRemove = () => {
+		setShowRemoveModal(false);
+		setRemoveProductId(null);
 	};
 
 	const filteredProducts = products.filter(
 		(product) => filter === ALL_FILTER || normalizeCategory(product.category ?? "") === normalizeCategory(filter),
 	);
 
-	const subtotal = products.reduce((sum, p) => sum + (quantities[p.id] ?? 0) * p.price, 0);
-
-	const orderItems = products.filter((p) => (quantities[p.id] ?? 0) > 0);
+	const subtotal = cartEntries.reduce((sum, e) => sum + e.quantity * e.unitPrice, 0);
 
 	const total = Number(subtotal.toFixed(2));
 	const cashReceivedAmount = parseCurrencyInput(cashReceived);
 	const cashChange = Math.max(cashReceivedAmount - total, 0);
 	const missingAmount = Math.max(total - cashReceivedAmount, 0);
 
-	const totalItemsCount = Object.values(quantities).reduce((s, v) => s + (v ?? 0), 0);
+	const totalItemsCount = cartEntries.reduce((s, e) => s + e.quantity, 0);
 
 	const closePaymentFlow = () => {
 		setShowPaymentModal(false);
@@ -161,15 +257,22 @@ export default function CreateOrdersPage() {
 		setOrderError(null);
 	};
 
+	const resetCart = () => {
+		setCartEntries([]);
+		setShowRemoveModal(false);
+		setRemoveProductId(null);
+	};
+
 	const handleSubmitOrder = async () => {
 		if (!selectedPayment) return;
 		setSubmitting(true);
 		setOrderError(null);
 		try {
-			const listItems = orderItems.map((p) => ({
-				id: p.id,
-				quantity: quantities[p.id],
-				unit_price: p.price,
+			const listItems = cartEntries.map((e) => ({
+				id: e.productId,
+				quantity: e.quantity,
+				unit_price: e.unitPrice,
+				customizations: e.customizationIds.length > 0 ? e.customizationIds : undefined,
 			}));
 			const payload = {
 				list_items: listItems,
@@ -195,7 +298,19 @@ export default function CreateOrdersPage() {
 				return;
 			}
 			const data = await res.json();
-			setQuantities({});
+			// Store order customization info for the kitchen screen
+			try {
+				const stored = JSON.parse(localStorage.getItem("orderCustomizations") ?? "{}");
+				stored[String(data.id)] = cartEntries.map((e) => ({
+					productId: e.productId,
+					quantity: e.quantity,
+					unitPrice: e.unitPrice,
+					customizationDescs: e.customizationDescs,
+					customizationIds: e.customizationIds,
+				}));
+				localStorage.setItem("orderCustomizations", JSON.stringify(stored));
+			} catch { /* localStorage unavailable */ }
+			resetCart();
 			closePaymentFlow();
 			toast.success(`Pedido #${data.id} enviado!`, {
 				description: "Seu pedido j\u00E1 est\u00E1 sendo preparado.",
@@ -266,7 +381,10 @@ export default function CreateOrdersPage() {
 									key={product.id}
 									product={product}
 									onQuantityChange={handleQuantityChange}
+									onAddWithCustomizations={handleAddWithCustomizations}
+									onRemoveWithCustomizations={handleRemoveWithCustomizations}
 									initialQuantity={quantities[product.id] ?? 0}
+									hasCustomizationsInCart={cartEntries.some((e) => e.productId === product.id && e.customizationIds.length > 0)}
 								/>
 							))}
 						</div>
@@ -283,19 +401,28 @@ export default function CreateOrdersPage() {
 					</div>
 
 					<div style={{ flex: 1, overflowY: "auto", paddingRight: 6 }}>
-						{orderItems.length === 0 ? (
+						{cartEntries.length === 0 ? (
 							<p style={{ color: "#aaa", fontSize: 14 }}>Nenhum item selecionado.</p>
 						) : (
 							<div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-								{orderItems.map((p) => (
-									<div key={p.id} style={{ background: "#fafafa", borderRadius: 8, padding: 12, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
-										<div style={{ flex: 1, minWidth: 0 }}>
-											<p style={{ margin: 0, fontWeight: 600, fontSize: 14, color: "#222", whiteSpace: "normal", overflowWrap: "break-word", wordBreak: "break-word" }}>{p.name}</p>
-											<p style={{ margin: 0, fontSize: 12, color: "#888" }}>{quantities[p.id]}x R$ {p.price.toFixed(2).replace(".", ",")}</p>
+								{cartEntries.map((entry) => {
+									const product = products.find((p) => p.id === entry.productId);
+									const itemTotal = entry.quantity * entry.unitPrice;
+									return (
+										<div key={entry.key} style={{ background: "#fafafa", borderRadius: 8, padding: 12, display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+											<div style={{ flex: 1, minWidth: 0 }}>
+												<p style={{ margin: 0, fontWeight: 600, fontSize: 14, color: "#222", whiteSpace: "normal", overflowWrap: "break-word", wordBreak: "break-word" }}>{product?.name ?? `Produto #${entry.productId}`}</p>
+												<p style={{ margin: 0, fontSize: 12, color: "#888" }}>{entry.quantity}x R$ {entry.unitPrice.toFixed(2).replace(".", ",")}</p>
+												{entry.customizationDescs.length > 0 && (
+													<p style={{ margin: "2px 0 0", fontSize: 11, color: "#f08918", fontStyle: "italic" }}>
+														+ {entry.customizationDescs.join(", ")}
+													</p>
+												)}
+											</div>
+											<span style={{ fontWeight: 700, fontSize: 14, color: "#2e8b57", whiteSpace: "nowrap" }}>R$ {itemTotal.toFixed(2).replace(".", ",")}</span>
 										</div>
-										<span style={{ fontWeight: 700, fontSize: 14, color: "#2e8b57", whiteSpace: "nowrap" }}>R$ {((quantities[p.id] ?? 0) * p.price).toFixed(2).replace(".", ",")}</span>
-									</div>
-								))}
+									);
+								})}
 							</div>
 						)}
 					</div>
@@ -331,6 +458,81 @@ export default function CreateOrdersPage() {
 				</div>
 			</div>
 		</div>
+
+		{/* Remove Customization Modal */}
+		{showRemoveModal && removeProductId !== null && (
+			<div
+				style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 150, display: "flex", alignItems: "center", justifyContent: "center" }}
+				onClick={(e) => { if (e.target === e.currentTarget) handleCancelRemove(); }}
+			>
+				<div style={{ background: "#fff", borderRadius: 16, padding: 28, width: 420, maxWidth: "90vw", maxHeight: "80vh", display: "flex", flexDirection: "column", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
+					<h3 style={{ margin: "0 0 4px", fontSize: 18, fontWeight: 700, color: "#222" }}>
+						Remover {products.find((p) => p.id === removeProductId)?.name ?? `Produto #${removeProductId}`}
+					</h3>
+					<p style={{ margin: "0 0 20px", fontSize: 13, color: "#888" }}>
+						Selecione qual variação deseja remover
+					</p>
+					<div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: 8, marginBottom: 20 }}>
+						{cartEntries
+							.filter((e) => e.productId === removeProductId)
+							.map((entry) => (
+								<button
+									key={entry.key}
+									onClick={() => handleConfirmRemove(entry.key)}
+									style={{
+										display: "flex",
+										alignItems: "center",
+										justifyContent: "space-between",
+										gap: 10,
+										padding: "12px 14px",
+										borderRadius: 10,
+										border: "1.5px solid #e8e8e8",
+										background: "#fafafa",
+										cursor: "pointer",
+										width: "100%",
+										textAlign: "left",
+									}}
+									onMouseEnter={(e) => {
+										e.currentTarget.style.borderColor = "#e74c3c";
+										e.currentTarget.style.background = "#fff5f5";
+									}}
+									onMouseLeave={(e) => {
+										e.currentTarget.style.borderColor = "#e8e8e8";
+										e.currentTarget.style.background = "#fafafa";
+									}}
+								>
+									<div style={{ flex: 1, minWidth: 0 }}>
+										{entry.customizationDescs.length > 0 ? (
+											<span style={{ fontSize: 13, fontWeight: 500, color: "#333" }}>
+												{entry.customizationDescs.join(", ")}
+											</span>
+										) : (
+											<span style={{ fontSize: 13, fontWeight: 500, color: "#888", fontStyle: "italic" }}>
+												Sem personalização
+											</span>
+										)}
+										<div style={{ fontSize: 12, color: "#888", marginTop: 2 }}>{entry.quantity}x no carrinho</div>
+									</div>
+									<div style={{ fontSize: 12, fontWeight: 700, color: "#e74c3c", whiteSpace: "nowrap" }}>
+										Remover 1
+									</div>
+								</button>
+							))}
+						{cartEntries.filter((e) => e.productId === removeProductId).length === 0 && (
+							<div style={{ textAlign: "center", padding: 20, color: "#aaa", fontSize: 14 }}>
+								Nenhum item deste produto no carrinho.
+							</div>
+						)}
+					</div>
+					<button
+						onClick={handleCancelRemove}
+						style={{ width: "100%", padding: "11px 0", borderRadius: 8, border: "1px solid #e0e0e0", background: "#f5f5f5", fontWeight: 600, fontSize: 14, cursor: "pointer", color: "#555" }}
+					>
+						Cancelar
+					</button>
+				</div>
+			</div>
+		)}
 
 		{/* Payment Modal */}
 		{showPaymentModal && (

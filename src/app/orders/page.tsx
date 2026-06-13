@@ -5,20 +5,39 @@ import { OrdersCard, Order } from "@/components/ordersCard";
 import Dialog from "@/components/dialog";
 import { toast } from "sonner";
 
-interface OrderItem {
-    name: string;
-    quantity: number;
-    note?: string;
-}
-
 const sortOrders = (arr: Order[]) =>
     [...arr].sort((a, b) => (a.prioridade === b.prioridade ? 0 : a.prioridade ? -1 : 1));
+
+const groupItems = (items: any[]) => {
+    const grouped: any[] = [];
+    for (const item of items) {
+        const hasCust = item.customizations && item.customizations.length > 0;
+        if (!hasCust) {
+            const existing = grouped.find((g) => g.name === item.name && (!g.customizations || g.customizations.length === 0));
+            if (existing) {
+                existing.quantity += item.quantity;
+                continue;
+            }
+        }
+        grouped.push({ ...item });
+    }
+    return grouped;
+};
 
 const normalizeStatus = (value: unknown) => String(value ?? "").trim().toLowerCase();
 const toOrderId = (value: unknown) => Number(value);
 const REFRESH_INTERVAL_MS = 3000;
 
-const mapOrderItems = (order: any, nameToId: Map<string, number>) => {
+const getLocalCustomizations = (orderId: number) => {
+	try {
+		const stored = JSON.parse(localStorage.getItem("orderCustomizations") ?? "{}");
+		return (stored[String(orderId)] ?? []) as {
+			productId: number; quantity: number; unitPrice: number; customizationDescs: string[]; customizationIds: number[];
+		}[];
+	} catch { return []; }
+};
+
+const mapOrderItems = (order: any, nameToId: Map<string, number>, customizationNameMap?: Record<number, Record<number, string>>) => {
     const source = Array.isArray(order?.items)
         ? order.items
         : Array.isArray(order?.products)
@@ -47,12 +66,27 @@ const mapOrderItems = (order: any, nameToId: Map<string, number>) => {
             const fromName = name ? nameToId.get(name.toLowerCase()) : undefined;
             const productId = fromProductId ?? fromName;
             const note = typeof item.note === "string" ? item.note : typeof item.observation === "string" ? item.observation : undefined;
+            const customizations = Array.isArray(item.customizations) && item.customizations.length > 0
+                ? typeof item.customizations[0] === "number" || typeof item.customizations[0] === "string"
+                    // Backend returned array of IDs
+                    ? customizationNameMap && productId && customizationNameMap[productId]
+                        ? item.customizations
+                            .map((cid: any) => {
+                                const desc = customizationNameMap[productId]?.[Number(cid)];
+                                return desc ? { id: Number(cid), description: desc } : null;
+                            })
+                            .filter(Boolean)
+                        : item.customizations.map((cid: any) => ({ id: Number(cid), description: `#${cid}` }))
+                    // Backend returned array of objects {id, description}
+                    : item.customizations.map((c: any) => ({ id: Number(c.id), description: String(c.description ?? "") }))
+                : undefined;
             const safeName = name || (fromProductId ? `Item #${fromProductId}` : `Item ${index + 1}`);
 
             return {
                 name: safeName,
                 quantity,
                 note,
+                customizations,
                 image: productId ? `/api/products/${productId}/image` : undefined,
             } as any;
         })
@@ -67,7 +101,7 @@ export default function OrdersPage() {
     const fetchOrdersInQueue = useCallback(async (): Promise<Order[]> => {
         const [productsData, ordersData] = await Promise.all([
             fetch("/api/products").then((r) => r.ok ? r.json() : []).catch(() => []),
-            fetch("/api/orders?include=items&status=Fila&sort=id&order=asc").then((r) => r.ok ? r.json() : []).catch(() => []),
+            fetch("/api/orders?include=items_and_customizations&status=Fila&sort=id&order=asc").then((r) => r.ok ? r.json() : []).catch(() => []),
         ]);
 
         const nameToId = new Map<string, number>();
@@ -75,13 +109,51 @@ export default function OrdersPage() {
             if (p && p.name && p.id) nameToId.set(String(p.name).toLowerCase(), p.id);
         });
 
+        // Build customization name lookup map (fallback for backend without items_and_customizations)
+        const productIds = new Set<number>();
+        (ordersData || []).forEach((o: any) => {
+            (o.items || []).forEach((item: any) => {
+                if (Array.isArray(item.customization_ids) && item.customization_ids.length > 0) {
+                    const pid = Number(item.product_id ?? item.id);
+                    if (pid) productIds.add(pid);
+                }
+            });
+        });
+        const customizationNameMap: Record<number, Record<number, string>> = {};
+        await Promise.all(
+            Array.from(productIds).map(async (pid) => {
+                try {
+                    const res = await fetch(`/api/products/${pid}/customizations`);
+                    if (res.ok) {
+                        const options: any[] = await res.json();
+                        if (Array.isArray(options)) {
+                            customizationNameMap[pid] = {};
+                            options.forEach((opt: any) => {
+                                customizationNameMap[pid][Number(opt.id)] = String(opt.description ?? "");
+                            });
+                        }
+                    }
+                } catch { /* ignore */ }
+            }),
+        );
+
         const mapped: Order[] = (ordersData || [])
-            .map((o: any) => ({
-                id: o.id,
-                prioridade: !!o.priority,
-                status: o.status,
-                items: mapOrderItems(o, nameToId),
-            }));
+            .map((o: any) => {
+                const items = mapOrderItems(o, nameToId, customizationNameMap);
+                // Merge customization descriptions from localStorage (fallback)
+                const localItems = getLocalCustomizations(Number(o.id));
+                if (localItems.length > 0) {
+                    items.forEach((item: any, idx: number) => {
+                        if (idx < localItems.length && localItems[idx].customizationDescs.length > 0) {
+                            item.customizations = localItems[idx].customizationDescs.map((desc, i) => ({
+                                id: localItems[idx].customizationIds[i] ?? 0,
+                                description: desc,
+                            }));
+                        }
+                    });
+                }
+                return { id: o.id, prioridade: !!o.priority, status: o.status, items: groupItems(items) };
+            });
 
         return sortOrders(mapped);
     }, []);
@@ -108,7 +180,7 @@ export default function OrdersPage() {
                 return;
             }
             setOrders((prev) => sortOrders(prev.filter((o) => o.id !== id)));
-            toast.success(`Pedido #${id} esta pronto!`);
+            toast.success(`Pedido #${id} est\u00E1 pronto!`);
         } catch (err) {
             console.error("Failed to update order status", err);
         }
