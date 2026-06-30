@@ -12,7 +12,7 @@ import {
   type ChartConfig,
 } from "@/components/ui/chart";
 import { Skeleton } from "@/components/ui/skeleton";
-import { fetchOrdersWithItems, fetchProducts, buildMergedOrders } from "@/lib/api";
+import { fetchOrdersWithItems, fetchProducts, buildMergedOrders, filterLossOrders } from "@/lib/api";
 import type { MergedOrder } from "@/lib/types";
 import "@/app/admin/admin.css";
 
@@ -149,7 +149,7 @@ export default function DashboardTab() {
         fetchOrdersWithItems(),
         fetchProducts(),
       ]);
-      const merged = await buildMergedOrders(rawOrders);
+      const merged = await buildMergedOrders(filterLossOrders(rawOrders));
       const completed = merged.filter(
         (o) => o.status.toLowerCase() === "entregue" || o.status.toLowerCase() === "pronto",
       );

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { fetchOrdersWithItems, buildMergedOrders } from "@/lib/api";
+import { fetchOrdersWithItems, buildMergedOrders, filterLossOrders } from "@/lib/api";
 import type { MergedOrder } from "@/lib/types";
 import OrderTable from "./order-table";
 import OrderDetailDialog from "./order-detail-dialog";
@@ -19,7 +19,7 @@ export default function OrderHistoryTab() {
     setError(null);
     try {
       const raw = await fetchOrdersWithItems();
-      setOrders(await buildMergedOrders(raw));
+      setOrders(await buildMergedOrders(filterLossOrders(raw)));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao carregar pedidos");
     } finally {

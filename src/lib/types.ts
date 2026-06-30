@@ -28,6 +28,7 @@ export interface Order {
   updated_at?: string;
   products?: OrderProduct[];
   items?: OrderProduct[];
+  payment_method?: string;
 }
 
 export interface OrderItem {
@@ -44,4 +45,5 @@ export interface MergedOrder {
   status: string;
   items: OrderItem[];
   date: string;
+  payment_method?: string;
 }

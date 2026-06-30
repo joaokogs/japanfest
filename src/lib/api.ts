@@ -39,6 +39,21 @@ export async function fetchOrdersWithItems(): Promise<Order[]> {
   return request<Order[]>("/api/orders?include=items_and_customizations&sort=updated_at&order=desc");
 }
 
+const LOSS_PAYMENTS = ["Staff", "Perda", "Doação"];
+
+function getLossField(raw: Record<string, unknown>): string {
+  const val = raw.payment_method ?? raw.paymentMethod ?? raw.loss_type ?? raw.lossType ?? "";
+  return String(val);
+}
+
+export function isLossOrder(raw: Record<string, unknown>): boolean {
+  return LOSS_PAYMENTS.includes(getLossField(raw));
+}
+
+export function filterLossOrders<T>(orders: T[]): T[] {
+  return orders.filter((o) => !isLossOrder(o as unknown as Record<string, unknown>));
+}
+
 export async function updateOrderStatus(id: number, status: string): Promise<void> {
   const res = await fetch(`/api/orders/${id}/${status}`, { method: "PATCH" });
   if (!res.ok) {
@@ -80,6 +95,7 @@ export async function buildMergedOrders(rawOrders: Order[]): Promise<MergedOrder
     status: o.status,
     date: o.updated_at ?? o.created_at ?? "",
     items: mapOrderItems(o, productMap),
+    payment_method: o.payment_method,
   }));
 }
 

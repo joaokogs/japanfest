@@ -15,6 +15,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/create-products", label: "Criar Produtos" },
   { href: "/orders", label: "Pedidos" },
   { href: "/delivered", label: "Entregues" },
+  { href: "/losses", label: "Perdas" },
   { href: "/queue", label: "Fila" },
 ];
 
