@@ -102,6 +102,8 @@ export default function CreateOrdersPage() {
 	const [orderError, setOrderError] = useState<string | null>(null);
 	const [showRemoveModal, setShowRemoveModal] = useState(false);
 	const [removeProductId, setRemoveProductId] = useState<number | null>(null);
+	const [showReceiptDialog, setShowReceiptDialog] = useState(false);
+	const [createdOrderId, setCreatedOrderId] = useState<number | null>(null);
 
 	useEffect(() => {
 		let isMounted = true;
@@ -310,11 +312,9 @@ export default function CreateOrdersPage() {
 				}));
 				localStorage.setItem("orderCustomizations", JSON.stringify(stored));
 			} catch { /* localStorage unavailable */ }
-			resetCart();
 			closePaymentFlow();
-			toast.success(`Pedido #${data.id} enviado!`, {
-				description: "Seu pedido j\u00E1 est\u00E1 sendo preparado.",
-			});
+			setCreatedOrderId(data.id);
+			setShowReceiptDialog(true);
 		} catch (err) {
 			setOrderError("N\u00E3o foi poss\u00EDvel conectar ao servidor.");
 			console.error(err);
@@ -340,6 +340,32 @@ export default function CreateOrdersPage() {
 		}
 		setCashError(null);
 		handleSubmitOrder();
+	};
+
+	const finishOrder = () => {
+		const orderId = createdOrderId;
+		setShowReceiptDialog(false);
+		setCreatedOrderId(null);
+		resetCart();
+		if (orderId) {
+			toast.success(`Pedido #${orderId} enviado!`, {
+				description: "Seu pedido j\u00E1 est\u00E1 sendo preparado.",
+			});
+		}
+	};
+
+	const handlePrintReceipt = async () => {
+		if (!createdOrderId) return;
+		try {
+			await fetch(`/api/receipts?id=${createdOrderId}&type=receipt&status=printed`, {
+				method: "PATCH",
+			});
+		} catch {}
+		finishOrder();
+	};
+
+	const handleCloseReceipt = () => {
+		finishOrder();
 	};
 
 	const filterLabels: { key: string; label: string }[] = [
@@ -676,6 +702,36 @@ export default function CreateOrdersPage() {
 							style={{ flex: 2, padding: "11px 0", borderRadius: 8, border: "none", background: !submitting ? "#f08918" : "#e6e6e6", color: !submitting ? "#fff" : "#999", fontWeight: 700, fontSize: 14, cursor: !submitting ? "pointer" : "default" }}
 						>
 							{submitting ? "Enviando..." : "Confirmar Pedido"}
+						</button>
+					</div>
+				</div>
+			</div>
+		)}
+
+		{/* Receipt Dialog */}
+		{showReceiptDialog && createdOrderId && (
+			<div
+				style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 120, display: "flex", alignItems: "center", justifyContent: "center" }}
+				onClick={(e) => { if (e.target === e.currentTarget) handleCloseReceipt(); }}
+			>
+				<div style={{ background: "#fff", borderRadius: 16, padding: 32, width: 380, maxWidth: "90vw", boxShadow: "0 20px 60px rgba(0,0,0,0.2)", textAlign: "center" }}>
+					<div style={{ fontSize: 48, marginBottom: 12 }}>&#x1F5A8;</div>
+					<h2 style={{ margin: "0 0 8px", fontSize: 20, fontWeight: 700, color: "#222" }}>Imprimir Via da Cozinha</h2>
+					<p style={{ margin: "0 0 24px", fontSize: 14, color: "#666" }}>
+						Deseja imprimir a nota do pedido <strong>#{createdOrderId}</strong>?
+					</p>
+					<div style={{ display: "flex", gap: 10 }}>
+						<button
+							onClick={handleCloseReceipt}
+							style={{ flex: 1, padding: "11px 0", borderRadius: 8, border: "1px solid #e0e0e0", background: "#f5f5f5", fontWeight: 600, fontSize: 14, cursor: "pointer", color: "#555" }}
+						>
+							Fechar
+						</button>
+						<button
+							onClick={handlePrintReceipt}
+							style={{ flex: 2, padding: "11px 0", borderRadius: 8, border: "none", background: "#f08918", color: "#fff", fontWeight: 700, fontSize: 14, cursor: "pointer" }}
+						>
+							Imprimir
 						</button>
 					</div>
 				</div>
