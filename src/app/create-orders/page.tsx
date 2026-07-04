@@ -357,7 +357,7 @@ export default function CreateOrdersPage() {
 	const handlePrintReceipt = async () => {
 		if (!createdOrderId) return;
 		try {
-			await fetch(`/api/receipts?id=${createdOrderId}&type=receipt&status=printed`, {
+			await fetch(`/api/receipts?id=${createdOrderId}&type=receipt&status=pendente`, {
 				method: "PATCH",
 			});
 		} catch {}
@@ -716,7 +716,7 @@ export default function CreateOrdersPage() {
 			>
 				<div style={{ background: "#fff", borderRadius: 16, padding: 32, width: 380, maxWidth: "90vw", boxShadow: "0 20px 60px rgba(0,0,0,0.2)", textAlign: "center" }}>
 					<div style={{ fontSize: 48, marginBottom: 12 }}>&#x1F5A8;</div>
-					<h2 style={{ margin: "0 0 8px", fontSize: 20, fontWeight: 700, color: "#222" }}>Imprimir Via da Cozinha</h2>
+					<h2 style={{ margin: "0 0 8px", fontSize: 20, fontWeight: 700, color: "#222" }}>Imprimir Via da Cozinha </h2>
 					<p style={{ margin: "0 0 24px", fontSize: 14, color: "#666" }}>
 						Deseja imprimir a nota do pedido <strong>#{createdOrderId}</strong>?
 					</p>
