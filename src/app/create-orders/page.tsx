@@ -357,7 +357,7 @@ export default function CreateOrdersPage() {
 	const handlePrintReceipt = async () => {
 		if (!createdOrderId) return;
 		try {
-			await fetch(`/api/receipts?id=${createdOrderId}&type=receipt&status=pendente`, {
+			await fetch(`/api/receipts?id=${createdOrderId}&type=receipt&status=Pendente`, {
 				method: "PATCH",
 			});
 		} catch {}
