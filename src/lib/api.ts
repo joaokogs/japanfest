@@ -39,7 +39,7 @@ export async function fetchOrdersWithItems(): Promise<Order[]> {
   return request<Order[]>("/api/orders?include=items_and_customizations&sort=updated_at&order=desc");
 }
 
-const LOSS_PAYMENTS = ["Staff", "Perda", "Doação"];
+const LOSS_PAYMENTS = ["Staff", "Perda",];
 
 function getLossField(raw: Record<string, unknown>): string {
   const val = raw.payment_method ?? raw.paymentMethod ?? raw.loss_type ?? raw.lossType ?? "";

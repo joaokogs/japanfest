@@ -20,9 +20,9 @@ type LossEntry = {
 	unitPrice: number;
 };
 
-type LossType = "Staff" | "Perda" | "Doação";
+type LossType = "Staff" | "Perda" ;
 
-const LOSS_TYPES: LossType[] = ["Staff", "Perda", "Doação"];
+const LOSS_TYPES: LossType[] = ["Staff", "Perda"];
 
 const ALL_FILTER = "todos";
 

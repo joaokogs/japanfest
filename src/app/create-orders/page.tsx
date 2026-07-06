@@ -55,13 +55,14 @@ const extractCategories = (payload: unknown): string[] => {
 	return Array.from(unique.values());
 };
 
-type PaymentMethod = "Cart\u00E3o de D\u00E9bito" | "Cart\u00E3o de Cr\u00E9dito" | "Pix" | "Dinheiro";
+type PaymentMethod = "Cart\u00E3o de D\u00E9bito" | "Cart\u00E3o de Cr\u00E9dito" | "Pix" | "Dinheiro" | "Doa\u00E7\u00E3o";
 
 const PAYMENT_OPTIONS: { key: PaymentMethod; icon: string }[] = [
 	{ key: "Cart\u00E3o de Cr\u00E9dito", icon: "\uD83D\uDCB3" },
 	{ key: "Cart\u00E3o de D\u00E9bito", icon: "\uD83C\uDFE7" },
 	{ key: "Pix", icon: "\uD83D\uDCF1" },
 	{ key: "Dinheiro", icon: "\uD83D\uDCB5" },
+	{ key: "Doa\u00E7\u00E3o", icon: "\u2764\uFE0F" },
 ];
 
 const formatCurrency = (value: number) => `R$ ${value.toFixed(2).replace(".", ",")}`;
