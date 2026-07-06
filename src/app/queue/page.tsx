@@ -123,7 +123,14 @@ export default function QueuePage() {
   useEffect(() => {
     let source: EventSource | null = null;
     let reconnectTimer: number | null = null;
+    let pollTimer: number | null = null;
     let mounted = true;
+
+    const pollAndRefresh = async () => {
+      if (!mounted) return;
+      const data = await fetchOrders();
+      if (mounted && data) applyOrders(data, true);
+    };
 
     const connect = () => {
       source = new EventSource("/api/events/orders");
@@ -165,9 +172,7 @@ export default function QueuePage() {
         source?.close();
         if (!mounted) return;
         reconnectTimer = window.setTimeout(async () => {
-          if (!mounted) return;
-          const data = await fetchOrders();
-          if (mounted && data) applyOrders(data, true);
+          await pollAndRefresh();
           connect();
         }, 5000);
       };
@@ -175,10 +180,13 @@ export default function QueuePage() {
 
     connect();
 
+    pollTimer = window.setInterval(pollAndRefresh, 3000);
+
     return () => {
       mounted = false;
       source?.close();
       if (reconnectTimer) window.clearTimeout(reconnectTimer);
+      if (pollTimer) window.clearInterval(pollTimer);
     };
   }, []);
 
@@ -203,6 +211,7 @@ export default function QueuePage() {
           label={activeCelebration}
           onDone={handleCelebrationDone}
           durationMs={READY_CELEBRATION_TIMEOUT_MS}
+          fontScale={pageFontScale}
         />
       )}
       

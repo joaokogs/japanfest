@@ -36,7 +36,7 @@ export async function fetchOrders(
 }
 
 export async function fetchOrdersWithItems(): Promise<Order[]> {
-  return request<Order[]>("/api/orders?include=items_and_customizations&sort=updated_at&order=desc");
+  return request<Order[]>("/api/orders?include=items&sort=updated_at&order=desc");
 }
 
 const LOSS_PAYMENTS = ["Staff", "Perda",];

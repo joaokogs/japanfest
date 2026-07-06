@@ -97,7 +97,7 @@ export default function DeliveredPage() {
         (async () => {
             const [productsData, ordersData] = await Promise.all([
                 fetch("/api/products").then((r) => r.ok ? r.json() : []).catch(() => []),
-                fetch("/api/orders?include=items_and_customizations&status=Pronto&sort=id&order=asc").then((r) => r.ok ? r.json() : []).catch(() => []),
+                fetch("/api/orders?include=items&status=Pronto&sort=id&order=asc").then((r) => r.ok ? r.json() : []).catch(() => []),
             ]);
 
             const nameToId = new Map<string, number>();

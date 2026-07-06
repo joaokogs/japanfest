@@ -109,7 +109,7 @@ export default function OrdersPage() {
             cachedProducts = productsData;
         }
 
-        const ordersData = await fetch("/api/orders?include=items_and_customizations&status=Fila&sort=id&order=asc").then((r) => r.ok ? r.json() : []).catch(() => []);
+        const ordersData = await fetch("/api/orders?include=items&status=Fila&sort=id&order=asc").then((r) => r.ok ? r.json() : []).catch(() => []);
 
         const nameToId = new Map<string, number>();
         (productsData || []).forEach((p: any) => {
