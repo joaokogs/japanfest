@@ -4,6 +4,7 @@ import React, { useState, useCallback, useRef } from "react";
 import { toast } from "sonner";
 import { ImageUploader } from "@/components/imageUploader";
 import { ManageCustomizations } from "@/components/manageCustomizations";
+import StockMovementTab from "@/components/admin/stock-movement-tab";
 import "./create-products.css";
 
 interface FormState {
@@ -28,7 +29,7 @@ const INITIAL_FORM: FormState = {
 
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
 
-const TABS = ["Novo Produto", "Customizações"] as const;
+const TABS = ["Novo Produto", "Customizações", "Movimentar Estoque"] as const;
 type Tab = (typeof TABS)[number];
 
 export default function CreateProductsPage() {
@@ -477,6 +478,8 @@ export default function CreateProductsPage() {
         {activeTab === "Customizações" && (
           <ManageCustomizations key={customizationsSubmitted ? "submitted" : "idle"} />
         )}
+
+        {activeTab === "Movimentar Estoque" && <StockMovementTab />}
       </div>
     </div>
   );

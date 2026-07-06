@@ -1,4 +1,4 @@
-import type { MergedOrder, Order, OrderItem, Product, StockEntry } from "./types";
+import type { MergedOrder, Order, OrderItem, Product, StockEntry, StockMovement } from "./types";
 
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
   const res = await fetch(url, options);
@@ -81,6 +81,32 @@ export async function updateStock(productId: number, quantity: number): Promise<
       body = "<unreadable>";
     }
     throw new Error(body || `Erro HTTP ${res.status}`);
+  }
+}
+
+export async function createStockMovement(
+  movement: StockMovement,
+): Promise<void> {
+  const res = await fetch("/api/stocks/movements", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(movement),
+  });
+  if (!res.ok) {
+    let body = "";
+    try {
+      body = await res.text();
+    } catch {
+      body = "<unreadable>";
+    }
+    const detail = `${res.status} ${res.statusText} — ${body}`;
+    console.error("[createStockMovement] erro:", {
+      status: res.status,
+      statusText: res.statusText,
+      body,
+      movement,
+    });
+    throw new Error(detail);
   }
 }
 

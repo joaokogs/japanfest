@@ -12,6 +12,13 @@ export interface StockEntry {
   quantity: number;
 }
 
+export interface StockMovement {
+  product_id: number;
+  order_id?: number;
+  quantity: number;
+  type: string;
+}
+
 export interface OrderProduct {
   product_id: number;
   name: string;

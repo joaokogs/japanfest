@@ -26,7 +26,9 @@ const groupItems = (items: any[]) => {
 
 const normalizeStatus = (value: unknown) => String(value ?? "").trim().toLowerCase();
 const toOrderId = (value: unknown) => Number(value);
-const REFRESH_INTERVAL_MS = 3000;
+/* cache de produtos e customizações (mudam raramente) */
+let cachedProducts: any[] | null = null;
+let cachedCustomizationMap: Record<number, Record<number, string>> = {};
 
 const getLocalCustomizations = (orderId: number) => {
 	try {
@@ -99,43 +101,53 @@ export default function OrdersPage() {
     const [pendingId, setPendingId] = useState<number | null>(null);
 
     const fetchOrdersInQueue = useCallback(async (): Promise<Order[]> => {
-        const [productsData, ordersData] = await Promise.all([
-            fetch("/api/products").then((r) => r.ok ? r.json() : []).catch(() => []),
-            fetch("/api/orders?include=items_and_customizations&status=Fila&sort=id&order=asc").then((r) => r.ok ? r.json() : []).catch(() => []),
-        ]);
+        let productsData: any[];
+        if (cachedProducts) {
+            productsData = cachedProducts;
+        } else {
+            productsData = await fetch("/api/products").then((r) => r.ok ? r.json() : []).catch(() => []);
+            cachedProducts = productsData;
+        }
+
+        const ordersData = await fetch("/api/orders?include=items_and_customizations&status=Fila&sort=id&order=asc").then((r) => r.ok ? r.json() : []).catch(() => []);
 
         const nameToId = new Map<string, number>();
         (productsData || []).forEach((p: any) => {
             if (p && p.name && p.id) nameToId.set(String(p.name).toLowerCase(), p.id);
         });
 
-        // Build customization name lookup map (fallback for backend without items_and_customizations)
-        const productIds = new Set<number>();
-        (ordersData || []).forEach((o: any) => {
-            (o.items || []).forEach((item: any) => {
-                if (Array.isArray(item.customization_ids) && item.customization_ids.length > 0) {
-                    const pid = Number(item.product_id ?? item.id);
-                    if (pid) productIds.add(pid);
-                }
-            });
-        });
-        const customizationNameMap: Record<number, Record<number, string>> = {};
-        await Promise.all(
-            Array.from(productIds).map(async (pid) => {
-                try {
-                    const res = await fetch(`/api/products/${pid}/customizations`);
-                    if (res.ok) {
-                        const options: any[] = await res.json();
-                        if (Array.isArray(options)) {
-                            customizationNameMap[pid] = {};
-                            options.forEach((opt: any) => {
-                                customizationNameMap[pid][Number(opt.id)] = String(opt.description ?? "");
-                            });
-                        }
+        let customizationNameMap: Record<number, Record<number, string>>;
+        if (Object.keys(cachedCustomizationMap).length > 0) {
+            customizationNameMap = cachedCustomizationMap;
+        } else {
+            customizationNameMap = {};
+            const productIds = new Set<number>();
+            (ordersData || []).forEach((o: any) => {
+                (o.items || []).forEach((item: any) => {
+                    if (Array.isArray(item.customization_ids) && item.customization_ids.length > 0) {
+                        const pid = Number(item.product_id ?? item.id);
+                        if (pid) productIds.add(pid);
                     }
-                } catch { /* ignore */ }
-            }),
-        );
+                });
+            });
+            await Promise.all(
+                Array.from(productIds).map(async (pid) => {
+                    try {
+                        const res = await fetch(`/api/products/${pid}/customizations`);
+                        if (res.ok) {
+                            const options: any[] = await res.json();
+                            if (Array.isArray(options)) {
+                                customizationNameMap[pid] = {};
+                                options.forEach((opt: any) => {
+                                    customizationNameMap[pid][Number(opt.id)] = String(opt.description ?? "");
+                                });
+                            }
+                        }
+                    } catch { /* ignore */ }
+                }),
+            );
+            cachedCustomizationMap = customizationNameMap;
+        }
 
         const mapped: Order[] = (ordersData || [])
             .map((o: any) => {
@@ -204,53 +216,59 @@ export default function OrdersPage() {
     }, [fetchOrdersInQueue]);
 
     useEffect(() => {
-        const source = new EventSource("/api/events/orders");
+        let source: EventSource | null = null;
+        let reconnectTimer: number | null = null;
+        let mounted = true;
 
-        source.onmessage = (event) => {
-            let payload: { id?: number | string; status?: string } | null = null;
-            try {
-                payload = JSON.parse(event.data);
-            } catch {
-                return;
-            }
+        const connect = () => {
+            source = new EventSource("/api/events/orders");
 
-            const status = normalizeStatus(payload?.status);
-            const orderId = toOrderId(payload?.id);
-            if (!status) return;
-
-            if (status === "fila" || status === "novo" || status === "recebido" || status === "em preparo" || status === "preparando") {
-                void refreshOrders();
-                return;
-            }
-
-            if (status === "pronto" || status === "entregue" || status === "cancelado") {
-                if (Number.isFinite(orderId)) {
-                    setOrders((prev) => sortOrders(prev.filter((o) => o.id !== orderId)));
-                } else {
-                    void refreshOrders();
+            source.onmessage = (event) => {
+                let payload: { id?: number | string; status?: string } | null = null;
+                try {
+                    payload = JSON.parse(event.data);
+                } catch {
+                    return;
                 }
-                return;
-            }
 
-            // Qualquer status não mapeado também força sincronização.
-            void refreshOrders();
+                const status = normalizeStatus(payload?.status);
+                const orderId = toOrderId(payload?.id);
+                if (!status) return;
+
+                if (status === "fila" || status === "novo" || status === "recebido" || status === "em preparo" || status === "preparando") {
+                    void refreshOrders();
+                    return;
+                }
+
+                if (status === "pronto" || status === "entregue" || status === "cancelado") {
+                    if (Number.isFinite(orderId)) {
+                        setOrders((prev) => sortOrders(prev.filter((o) => o.id !== orderId)));
+                    } else {
+                        void refreshOrders();
+                    }
+                    return;
+                }
+
+                void refreshOrders();
+            };
+
+            source.onerror = () => {
+                source?.close();
+                if (!mounted) return;
+                reconnectTimer = window.setTimeout(() => {
+                    if (!mounted) return;
+                    void refreshOrders();
+                    connect();
+                }, 5000);
+            };
         };
 
-        source.onerror = (error) => {
-            console.error("SSE /events/orders error", error);
-        };
+        connect();
 
         return () => {
-            source.close();
-        };
-    }, [refreshOrders]);
-
-    useEffect(() => {
-        const intervalId = window.setInterval(() => {
-            void refreshOrders();
-        }, REFRESH_INTERVAL_MS);
-        return () => {
-            window.clearInterval(intervalId);
+            mounted = false;
+            source?.close();
+            if (reconnectTimer) window.clearTimeout(reconnectTimer);
         };
     }, [refreshOrders]);
 
