@@ -36,8 +36,7 @@ export const ManageCustomizations: React.FC = () => {
         if (!mounted) return;
         if (res.ok) {
           const data: Product[] = await res.json();
-          const filtered = (Array.isArray(data) ? data : []).filter((p) => p.customizable);
-          setProducts(filtered);
+          setProducts(Array.isArray(data) ? data : []);
           setLoadError(null);
         } else {
           setProducts([]);
@@ -153,7 +152,7 @@ export const ManageCustomizations: React.FC = () => {
           <p className="manage-customizations-error" role="alert">{loadError}</p>
         ) : products.length === 0 ? (
           <p className="manage-customizations-empty">
-            Nenhum produto personalizável encontrado.
+            Nenhum produto encontrado.
           </p>
         ) : (
           <select
