@@ -3,16 +3,8 @@
 import React, { useState, useEffect } from "react";
 import { ProductsCard } from "@/components/productsCard";
 import { toast } from "sonner";
+import { mockApi, MOCK_PRODUCTS, type MockProduct } from "@/lib/mockData";
 import "./losses.css";
-
-type Product = {
-	id: number;
-	name: string;
-	price: number;
-	category: string;
-	priority: boolean;
-	customizable?: boolean;
-};
 
 type LossEntry = {
 	productId: number;
@@ -30,37 +22,11 @@ const normalizeCategory = (value: string) => value.trim().toLowerCase();
 
 const toCategoryLabel = (value: string) => value.charAt(0).toUpperCase() + value.slice(1);
 
-const extractCategoryName = (item: unknown) => {
-	if (typeof item === "string") return item;
-	if (item && typeof item === "object") {
-		const categoryObject = item as { name?: unknown; category?: unknown; label?: unknown; title?: unknown };
-		const raw = categoryObject.name ?? categoryObject.category ?? categoryObject.label ?? categoryObject.title;
-		return typeof raw === "string" ? raw : "";
-	}
-	return "";
-};
-
-const extractCategories = (payload: unknown): string[] => {
-	const list = Array.isArray(payload)
-		? payload
-		: payload && typeof payload === "object" && Array.isArray((payload as { categories?: unknown }).categories)
-			? ((payload as { categories: unknown[] }).categories ?? [])
-			: [];
-	const unique = new Map<string, string>();
-	for (const item of list) {
-		const name = extractCategoryName(item).trim();
-		if (!name) continue;
-		const normalized = normalizeCategory(name);
-		if (!unique.has(normalized)) unique.set(normalized, name);
-	}
-	return Array.from(unique.values());
-};
-
 export default function LossesPage() {
 	const [filter, setFilter] = useState<string>(ALL_FILTER);
 	const [categories, setCategories] = useState<string[]>([]);
 	const [entries, setEntries] = useState<LossEntry[]>([]);
-	const [products, setProducts] = useState<Product[]>([]);
+	const [products, setProducts] = useState<MockProduct[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [lossType, setLossType] = useState<LossType>("Staff");
 	const [showConfirm, setShowConfirm] = useState(false);
@@ -70,24 +36,10 @@ export default function LossesPage() {
 		let isMounted = true;
 		const loadData = async () => {
 			try {
-				const [productsRes, categoriesRes] = await Promise.all([
-					fetch("/api/products"),
-					fetch("/api/products/categories"),
-				]);
-
-				const productsData: Product[] = productsRes.ok ? await productsRes.json() : [];
-				const categoriesPayload: unknown = categoriesRes.ok ? await categoriesRes.json() : [];
-				const categoryFromApi = extractCategories(categoriesPayload);
-				const fallbackCategories = Array.from(
-					new Set(
-						productsData
-							.map((product) => product.category?.trim())
-							.filter((category): category is string => Boolean(category)),
-					),
-				);
-				const resolvedCategories = (categoryFromApi.length > 0 ? categoryFromApi : fallbackCategories).filter(
-					(category) => normalizeCategory(category) !== ALL_FILTER,
-				);
+				const productsData = await mockApi.getProducts();
+				const resolvedCategories = MOCK_PRODUCTS
+					.map((p) => p.category)
+					.filter((c, i, arr) => c && arr.indexOf(c) === i && c.toLowerCase() !== "todos");
 
 				if (!isMounted) return;
 				setProducts(productsData);
@@ -103,9 +55,7 @@ export default function LossesPage() {
 		};
 
 		loadData();
-		return () => {
-			isMounted = false;
-		};
+		return () => { isMounted = false; };
 	}, []);
 
 	const quantities: Record<number, number> = {};
@@ -163,27 +113,6 @@ export default function LossesPage() {
 		if (total <= 0) return;
 		setSubmitting(true);
 		try {
-			const listItems = entries.map((e) => ({
-				id: e.productId,
-				quantity: e.quantity,
-				unit_price: e.unitPrice,
-				customizations: [],
-			}));
-			const payload = {
-				list_items: listItems,
-				loss_type: lossType,
-				total_price: total,
-			};
-			const res = await fetch("/api/losses", {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify(payload),
-			});
-			if (!res.ok) {
-				const body = await res.text();
-				toast.error(`Erro ${res.status}: ${body || "Falha ao registrar perda"}`);
-				return;
-			}
 			setShowConfirm(false);
 			resetEntries();
 			toast.success("Perda registrada com sucesso!");

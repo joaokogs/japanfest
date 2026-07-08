@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { fetchProducts, fetchStocks, createStockMovement } from "@/lib/api";
 import type { Product } from "@/lib/types";
+import { getProductImageUrl } from "@/lib/mockData";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -181,7 +182,7 @@ export default function StockMovementTab() {
             {filtered.map((row) => (
               <div key={row.product.id} className="stock-movement-item">
                 <img
-                  src={`/api/products/${row.product.id}/image`}
+                  src={getProductImageUrl(row.product.id)}
                   alt={row.product.name}
                   className="stock-movement-thumb"
                   loading="lazy"

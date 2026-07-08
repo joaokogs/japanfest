@@ -1,25 +1,24 @@
-import type { MergedOrder, Order, OrderItem, Product, StockEntry, StockMovement } from "./types";
-
-async function request<T>(url: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(url, options);
-  if (!res.ok) {
-    let body = "";
-    try {
-      body = await res.text();
-    } catch {
-      body = "<unreadable>";
-    }
-    throw new Error(body || `Erro HTTP ${res.status}`);
-  }
-  return res.json();
-}
+import type { MergedOrder, Order, OrderItem, OrderProduct, Product, StockEntry, StockMovement } from "./types";
+import { MOCK_PRODUCTS, MOCK_CUSTOMIZATIONS, MOCK_STOCKS, mockApi, getProductImageUrl } from "./mockData";
 
 export async function fetchProducts(): Promise<Product[]> {
-  return request<Product[]>("/api/products");
+  const data = await mockApi.getProducts();
+  return data.map((p) => ({
+    id: p.id,
+    name: p.name,
+    price: p.price,
+    category: p.category,
+    priority: p.priority,
+    customizable: p.customizable,
+  }));
+}
+
+export async function fetchProductCustomizations(productId: number): Promise<{ id: number; description: string }[]> {
+  return MOCK_CUSTOMIZATIONS[productId] ?? [];
 }
 
 export async function fetchStocks(): Promise<StockEntry[]> {
-  return request<StockEntry[]>("/api/stocks");
+  return mockApi.getStocks();
 }
 
 export async function fetchOrders(
@@ -27,19 +26,24 @@ export async function fetchOrders(
   status?: string,
   order?: string,
 ): Promise<Order[]> {
-  const params = new URLSearchParams();
-  if (sort) params.set("sort", sort);
-  if (status) params.set("status", status);
-  if (order) params.set("order", order);
-  const qs = params.toString();
-  return request<Order[]>(`/api/orders${qs ? `?${qs}` : ""}`);
+  const data = await mockApi.getOrders(status);
+  const sorted = [...data];
+  if (sort === "id" && order === "asc") {
+    sorted.sort((a, b) => a.id - b.id);
+  } else if (sort === "updated_at" && order === "desc") {
+    sorted.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+  }
+  return sorted.map(mapMockOrderToOrder);
 }
 
 export async function fetchOrdersWithItems(): Promise<Order[]> {
-  return request<Order[]>("/api/orders?include=items&sort=updated_at&order=desc");
+  const data = await mockApi.getOrders();
+  return data
+    .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
+    .map(mapMockOrderToOrder);
 }
 
-const LOSS_PAYMENTS = ["Staff", "Perda",];
+const LOSS_PAYMENTS = ["Staff", "Perda"];
 
 function getLossField(raw: Record<string, unknown>): string {
   const val = raw.payment_method ?? raw.paymentMethod ?? raw.loss_type ?? raw.lossType ?? "";
@@ -55,62 +59,41 @@ export function filterLossOrders<T>(orders: T[]): T[] {
 }
 
 export async function updateOrderStatus(id: number, status: string): Promise<void> {
-  const res = await fetch(`/api/orders/${id}/${status}`, { method: "PATCH" });
-  if (!res.ok) {
-    let body = "";
-    try {
-      body = await res.text();
-    } catch {
-      body = "<unreadable>";
-    }
-    throw new Error(body || `Erro HTTP ${res.status}`);
-  }
+  await mockApi.updateOrderStatus(id, status);
 }
 
 export async function updateStock(productId: number, quantity: number): Promise<void> {
-  const res = await fetch(`/api/stocks/${productId}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ quantity }),
-  });
-  if (!res.ok) {
-    let body = "";
-    try {
-      body = await res.text();
-    } catch {
-      body = "<unreadable>";
-    }
-    throw new Error(body || `Erro HTTP ${res.status}`);
+  const stocks = MOCK_STOCKS;
+  const idx = stocks.findIndex((s) => s.product_id === productId);
+  if (idx >= 0) {
+    stocks[idx].quantity = quantity;
   }
 }
 
-export async function createStockMovement(
-  movement: StockMovement,
-): Promise<void> {
-  const res = await fetch("/api/stocks/movements", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(movement),
-  });
-  if (!res.ok) {
-    let body = "";
-    try {
-      body = await res.text();
-    } catch {
-      body = "<unreadable>";
-    }
-    const detail = `${res.status} ${res.statusText} — ${body}`;
-    console.error("[createStockMovement] erro:", {
-      status: res.status,
-      statusText: res.statusText,
-      body,
-      movement,
-    });
-    throw new Error(detail);
-  }
+export async function createStockMovement(movement: StockMovement): Promise<void> {
+  await updateStock(movement.product_id, movement.quantity);
 }
 
-/** Map raw API orders into MergedOrder with resolved names & images */
+function mapMockOrderToOrder(mock: import("./mockData").MockOrder): Order {
+  const orderProducts: OrderProduct[] = mock.items.map((item) => ({
+    product_id: 0,
+    name: item.name,
+    quantity: item.quantity,
+    note: item.note,
+    customizations: item.customizations?.map((c) => c.description) ?? null,
+  }));
+  return {
+    id: mock.id,
+    priority: mock.priority,
+    status: mock.status,
+    created_at: mock.created_at,
+    updated_at: mock.updated_at,
+    products: orderProducts,
+    items: orderProducts,
+    payment_method: mock.payment_method,
+  };
+}
+
 export async function buildMergedOrders(rawOrders: Order[]): Promise<MergedOrder[]> {
   const products = await fetchProducts().catch(() => [] as Product[]);
   const productMap = new Map(products.map((p) => [p.id, p]));
@@ -138,7 +121,7 @@ function mapOrderItems(
       name: item.name || prod?.name || `Produto #${item.product_id}`,
       quantity: item.quantity,
       note: item.note,
-      image: prod ? `/api/products/${prod.id}/image` : undefined,
+      image: prod ? getProductImageUrl(prod.id) : undefined,
       customizations,
     };
   });
@@ -151,7 +134,6 @@ function parseCustomizations(
   const result: { id: number; description: string }[] = [];
   let idCounter = 0;
   for (const entry of raw) {
-    // Some entries are comma-separated like "teste,teste2,teste3"
     const parts = entry.split(",").map((s) => s.trim()).filter(Boolean);
     for (const part of parts) {
       result.push({ id: ++idCounter, description: part });

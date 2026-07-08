@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import { MOCK_CUSTOMIZATIONS, getProductImageUrl } from "@/lib/mockData";
 
 type CustomizationOption = {
 	id: number;
@@ -75,15 +76,9 @@ export const ProductsCard: React.FC<ProductsCardProps> = ({
 		setLoadingCustomizations(true);
 		setSelectedCustomizations([]);
 		try {
-			const res = await fetch(`/api/products/${product.id}/customizations`);
+			const data = MOCK_CUSTOMIZATIONS[product.id] ?? [];
 			if (!mountedRef.current) return;
-			if (res.ok) {
-				const data: CustomizationOption[] = await res.json();
-				if (!mountedRef.current) return;
-				setCustomizations(Array.isArray(data) ? data : []);
-			} else {
-				setCustomizations([]);
-			}
+			setCustomizations(data);
 		} catch {
 			if (mountedRef.current) setCustomizations([]);
 		} finally {
@@ -125,7 +120,7 @@ export const ProductsCard: React.FC<ProductsCardProps> = ({
 		<>
 			<div data-category={product.category ?? ""} className="product-card">
 				<img
-					src={`/api/products/${product.id}/image`}
+					src={getProductImageUrl(product.id)}
 					alt={product.name}
 				/>
 				<div className="title">{product.name}</div>

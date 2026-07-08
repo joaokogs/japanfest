@@ -1,0 +1,856 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Fukushima - Cardápio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700;900&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --orange-900: #7a2e00;
+      --orange-800: #9a3e00;
+      --orange-700: #c45400;
+      --orange-600: #e06500;
+      --orange-500: #f27600;
+      --orange-400: #ff8c1a;
+      --orange-300: #ffa94d;
+      --orange-200: #ffc78a;
+      --orange-100: #ffe4cc;
+      --bg-primary: #f8f6f2;
+      --bg-secondary: #efebe7;
+      --bg-card: #ffffff;
+      --bg-card-hover: #f5f2ed;
+      --text-primary: #1a1a1a;
+      --text-secondary: #666;
+      --text-muted: #999;
+      --border-color: #e0dbd5;
+    }
+
+    [data-theme="dark"] {
+      --bg-primary: #0a0a0a;
+      --bg-secondary: #111111;
+      --bg-card: #1a1a1a;
+      --bg-card-hover: #222;
+      --text-primary: #f0f0f0;
+      --text-secondary: #999;
+      --text-muted: #666;
+      --border-color: #222;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      min-height: 100vh;
+      line-height: 1.5;
+    }
+
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: var(--bg-secondary); }
+    ::-webkit-scrollbar-thumb { background: var(--orange-700); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--orange-600); }
+
+    .theme-toggle {
+      position: absolute;
+      top: 1rem;
+      right: 1rem;
+      z-index: 2;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      border: 1px solid var(--border-color);
+      background: var(--bg-card);
+      color: var(--text-secondary);
+      font-size: 1rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.25s;
+    }
+    .theme-toggle:hover {
+      border-color: var(--orange-600);
+      color: var(--orange-400);
+    }
+
+    .header {
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border-color);
+      padding: 2.5rem 1rem;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+    .header::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, transparent, var(--orange-500), var(--orange-300), var(--orange-500), transparent);
+    }
+    .header-content { position: relative; z-index: 1; }
+    .header-badge {
+      display: inline-block;
+      background: linear-gradient(135deg, var(--orange-700), var(--orange-500));
+      color: #fff;
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      padding: 0.25rem 0.8rem;
+      border-radius: 100px;
+      margin-bottom: 1rem;
+    }
+    .header h1 {
+      font-family: 'Noto Sans JP', sans-serif;
+      font-size: 3.2rem;
+      font-weight: 900;
+      letter-spacing: 8px;
+      background: linear-gradient(135deg, var(--orange-300), var(--orange-500), var(--orange-400));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .header h1 span {
+      font-weight: 300;
+      font-size: 2rem;
+      letter-spacing: 4px;
+    }
+    .header p {
+      color: var(--text-secondary);
+      margin-top: 0.5rem;
+      font-size: 0.9rem;
+      letter-spacing: 2px;
+    }
+    .header-ornament {
+      margin-top: 1rem;
+      color: var(--orange-600);
+      font-size: 1rem;
+      letter-spacing: 10px;
+      opacity: 0.5;
+    }
+
+    .container {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 2rem 1rem 4rem;
+    }
+
+    .category-nav {
+      display: flex;
+      gap: 0.5rem;
+      overflow-x: auto;
+      padding-bottom: 0.5rem;
+      margin-bottom: 2rem;
+      scrollbar-width: none;
+      position: sticky;
+      top: 0;
+      background: var(--bg-primary);
+      z-index: 10;
+      padding-top: 1rem;
+    }
+    .category-nav::-webkit-scrollbar { display: none; }
+    .category-btn {
+      flex-shrink: 0;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      color: var(--text-secondary);
+      padding: 0.5rem 1rem;
+      border-radius: 100px;
+      font-size: 0.8rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      white-space: nowrap;
+      font-family: 'Inter', sans-serif;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    .category-btn .nav-icon {
+      width: 20px;
+      height: 20px;
+    }
+    .category-btn:hover {
+      border-color: var(--orange-600);
+      color: var(--orange-400);
+    }
+    .category-btn.active {
+      background: linear-gradient(135deg, var(--orange-700), var(--orange-500));
+      border-color: transparent;
+      color: #fff;
+      box-shadow: 0 4px 15px rgba(242, 118, 0, 0.3);
+    }
+    .category-btn.active .nav-icon svg path,
+    .category-btn.active .nav-icon svg ellipse,
+    .category-btn.active .nav-icon svg rect,
+    .category-btn.active .nav-icon svg line,
+    .category-btn.active .nav-icon svg circle {
+      stroke: #fff !important;
+    }
+    .category-btn.active .nav-icon svg circle[fill] {
+      fill: #fff !important;
+    }
+
+    .category-section {
+      margin-bottom: 2.5rem;
+      scroll-margin-top: 5rem;
+    }
+    .category-header {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      margin-bottom: 1.25rem;
+      padding-bottom: 0.75rem;
+      border-bottom: 1px solid var(--border-color);
+    }
+    .category-header .cat-icon {
+      width: 36px;
+      height: 36px;
+    }
+    .category-header h2 {
+      font-family: 'Noto Sans JP', sans-serif;
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: var(--orange-300);
+      letter-spacing: 1px;
+    }
+    .category-header .count {
+      background: var(--bg-card);
+      color: var(--text-muted);
+      font-size: 0.7rem;
+      font-weight: 600;
+      padding: 0.1rem 0.5rem;
+      border-radius: 100px;
+    }
+    .category-line {
+      flex: 1;
+      height: 1px;
+      background: linear-gradient(90deg, var(--border-color), transparent);
+    }
+
+    .products-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 1rem;
+    }
+
+    .product-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 14px;
+      overflow: hidden;
+      transition: all 0.35s ease;
+      cursor: default;
+      position: relative;
+    }
+    .product-card:hover {
+      background: var(--bg-card-hover);
+      border-color: var(--orange-300);
+      transform: translateY(-3px);
+      box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+    }
+
+    .product-image {
+      width: 100%;
+      height: 170px;
+      background: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      overflow: hidden;
+    }
+    .product-image img {
+      max-width: 75%;
+      max-height: 80%;
+      object-fit: contain;
+      transition: transform 0.4s ease;
+    }
+    .product-card[data-id="15"] .product-image img {
+      max-width: 55%;
+      max-height: 65%;
+    }
+    .product-card:hover .product-image img {
+      transform: scale(1.04);
+    }
+    .product-image .placeholder-svg {
+      width: 64px;
+      height: 64px;
+      opacity: 0.5;
+      transition: opacity 0.3s;
+    }
+    .product-image::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 50px;
+      background: linear-gradient(transparent, var(--bg-card));
+    }
+
+    .product-body {
+      padding: 0.9rem 1rem 1rem;
+    }
+    .product-name {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+    .product-name .badge {
+      font-size: 0.55rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: 0.1rem 0.45rem;
+      border-radius: 4px;
+      background: rgba(242, 118, 0, 0.12);
+      color: var(--orange-400);
+      border: 1px solid rgba(242, 118, 0, 0.15);
+    }
+    .product-meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 0.6rem;
+    }
+    .product-price {
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: var(--orange-400);
+      font-variant-numeric: tabular-nums;
+    }
+    .product-price.free {
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      font-weight: 500;
+    }
+    .product-dots {
+      display: flex;
+      gap: 3px;
+    }
+    .product-dots span {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: var(--orange-700);
+      opacity: 0.3;
+      transition: opacity 0.3s;
+    }
+    .product-card:hover .product-dots span {
+      opacity: 0.7;
+    }
+    .product-card.has-customs {
+      cursor: pointer;
+    }
+
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      backdrop-filter: blur(4px);
+      z-index: 100;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+    }
+    [data-theme="light"] .modal-overlay {
+      background: rgba(0,0,0,0.25);
+    }
+    .modal-overlay.open {
+      display: flex;
+    }
+    .modal {
+      background: #fff;
+      border-radius: 16px;
+      width: 100%;
+      max-width: 440px;
+      max-height: 80vh;
+      overflow-y: auto;
+      animation: modalIn 0.25s ease;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+    }
+    [data-theme="dark"] .modal {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      box-shadow: none;
+    }
+    @keyframes modalIn {
+      from { opacity: 0; transform: translateY(20px) scale(0.96); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1.25rem 1.5rem;
+      border-bottom: 1px solid #eee;
+      position: sticky;
+      top: 0;
+      background: #fff;
+      z-index: 1;
+    }
+    [data-theme="dark"] .modal-header {
+      background: var(--bg-card);
+      border-bottom-color: var(--border-color);
+    }
+    .modal-header h3 {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+    .modal-header .modal-price {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--orange-400);
+    }
+    .modal-close {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      border: 1px solid var(--border-color);
+      background: transparent;
+      color: var(--text-secondary);
+      font-size: 1.1rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+      flex-shrink: 0;
+    }
+    .modal-close:hover {
+      background: var(--bg-card-hover);
+      border-color: var(--orange-600);
+      color: var(--orange-400);
+    }
+    .modal-body {
+      padding: 0.5rem 0;
+    }
+    .modal-section-label {
+      padding: 0.75rem 1.5rem 0.5rem;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-muted);
+    }
+    .custom-list {
+      list-style: none;
+      padding: 0.5rem 0;
+    }
+    .custom-list li {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.7rem 1.5rem;
+      font-size: 0.9rem;
+      color: var(--text-primary);
+      border-bottom: 1px solid #eee;
+    }
+    [data-theme="dark"] .custom-list li {
+      border-bottom-color: var(--border-color);
+    }
+    .custom-list li:last-child {
+      border-bottom: none;
+    }
+    .custom-list li::before {
+      content: '';
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--orange-600);
+      flex-shrink: 0;
+    }
+    .modal-footer {
+      padding: 1rem 1.5rem;
+      border-top: 1px solid #eee;
+      display: flex;
+      justify-content: flex-end;
+    }
+    [data-theme="dark"] .modal-footer {
+      border-top-color: var(--border-color);
+    }
+    .modal-btn {
+      background: linear-gradient(135deg, var(--orange-700), var(--orange-500));
+      color: #fff;
+      border: none;
+      padding: 0.65rem 2rem;
+      border-radius: 100px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.2s;
+      font-family: 'Inter', sans-serif;
+    }
+    .modal-btn:hover {
+      opacity: 0.9;
+    }
+
+    .no-customs {
+      padding: 2rem 1.5rem;
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 0.9rem;
+    }
+
+    .footer {
+      text-align: center;
+      padding: 2rem 1rem;
+      border-top: 1px solid var(--border-color);
+      color: var(--text-muted);
+      font-size: 0.8rem;
+      letter-spacing: 0.5px;
+    }
+    .footer .ornament {
+      color: var(--orange-600);
+      font-size: 1rem;
+      letter-spacing: 8px;
+      margin-bottom: 0.5rem;
+    }
+
+    @media (max-width: 700px) {
+      .products-grid {
+        grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+        gap: 0.8rem;
+      }
+      .header h1 { font-size: 2.2rem; letter-spacing: 4px; }
+      .header h1 span { font-size: 1.4rem; }
+      .header { padding: 1.5rem 1rem; }
+      .container { padding: 1rem 0.75rem 3rem; }
+      .product-image { height: 120px; }
+    }
+
+    @media (max-width: 500px) {
+      .products-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <button class="theme-toggle" id="themeToggle" aria-label="Alternar tema">☀️</button>
+    <div class="header-content">
+      <div class="header-badge">Cardápio Digital</div>
+      <h1>Fukushima</h1>
+      <p>Experiência gastronômica japonesa</p>
+      <div class="header-ornament">✦ ✦ ✦</div>
+    </div>
+  </header>
+
+  <div class="container" id="app"></div>
+
+  <footer class="footer">
+    <div class="ornament">✦ ✦ ✦</div>
+    <p>DJ 🕯️ / MARI 🖤 DANI/ JP 💗 YU &copy; 2026 &mdash; Todos os direitos reservados</p>
+  </footer>
+
+  <div class="modal-overlay" id="modal">
+    <div class="modal">
+      <div class="modal-header">
+        <div>
+          <h3 id="modal-title"></h3>
+          <span class="modal-price" id="modal-price"></span>
+        </div>
+        <button class="modal-close" id="modal-close">✕</button>
+      </div>
+      <div class="modal-body" id="modal-body"></div>
+      <div class="modal-footer">
+        <button class="modal-btn" id="modal-btn">Fechar</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const PRODUCTS = [
+      { "name": "Aizu Sauce Kushikatsu", "id": 4, "category": "Comidas", "customizable": true, "price": 15.0 },
+      { "name": "Coca-Cola", "id": 9, "category": "Bebidas", "customizable": true, "price": 10.0 },
+      { "name": "Coca-Cola Zero", "id": 10, "category": "Bebidas", "customizable": true, "price": 10.0 },
+      { "name": "Dose Sake Honjozo Kanzukuri", "id": 23, "category": "Bebidas Alcoólicas", "customizable": false, "price": 15.0 },
+      { "name": "Ecusson Pie", "id": 5, "category": "Sobremesas", "customizable": false, "price": 12.0 },
+      { "name": "Fanta Guaraná", "id": 12, "category": "Bebidas", "customizable": true, "price": 10.0 },
+      { "name": "Fanta Laranja", "id": 11, "category": "Bebidas", "customizable": true, "price": 10.0 },
+      { "name": "Água com Gás", "id": 16, "category": "Bebidas", "customizable": true, "price": 8.0 },
+      { "name": "Água Sem Gás", "id": 15, "category": "Bebidas", "customizable": true, "price": 8.0 },
+      { "name": "Gyozá 5Un", "id": 2, "category": "Comidas", "customizable": false, "price": 22.0 },
+      { "name": "Kitakata lámen", "id": 3, "category": "Comidas", "customizable": true, "price": 32.0 },
+      { "name": "Mugui Chá", "id": 6, "category": "Bebidas", "customizable": false, "price": 8.0 },
+      { "name": "Pct. Lamén Importado", "id": 7, "category": "Comidas", "customizable": false, "price": 15.0 },
+      { "name": "Sake Honjozo Kanzukuri", "id": 21, "category": "Bebidas Alcoólicas", "customizable": false, "price": 70.0 },
+      { "name": "Sake Junmai Karakuchi", "id": 22, "category": "Bebidas Alcoólicas", "customizable": false, "price": 85.0 },
+      { "name": "Suco Del Valle Maracujá", "id": 14, "category": "Bebidas", "customizable": true, "price": 9.0 },
+      { "name": "Schweppes Citrus", "id": 17, "category": "Bebidas", "customizable": true, "price": 10.0 },
+      { "name": "Suco Del Valle Uva", "id": 13, "category": "Bebidas", "customizable": true, "price": 9.0 }
+    ];
+
+
+
+    const CUSTOMIZATIONS = {
+      3: [{ "id": 1, "description": "Sem caldo" }, { "id": 2, "description": "Sem macarrão" }, { "id": 3, "description": "Sem naruto" }, { "id": 4, "description": "Sem chasu" }, { "id": 5, "description": "Sem nori" }, { "id": 6, "description": "Sem cebolinha" }],
+      4: [{ "id": 7, "description": "Sem molho" }],
+      9: [{ "id": 8, "description": "Sem gelo" }],
+      10: [{ "id": 9, "description": "Sem gelo" }],
+      11: [{ "id": 10, "description": "Sem gelo" }],
+      12: [{ "id": 11, "description": "Sem gelo" }],
+      13: [{ "id": 12, "description": "Sem gelo" }],
+      14: [{ "id": 13, "description": "Sem gelo" }],
+      15: [{ "id": 14, "description": "Sem gelo" }],
+      16: [{ "id": 15, "description": "Sem gelo" }],
+      17: [{ "id": 16, "description": "Sem gelo" }]
+    };
+
+    const CATEGORY_ORDER = [
+      'Comidas', 'Sobremesas', 'Bebidas', 'Bebidas Alcoólicas'
+    ];
+
+    const CATEGORY_SVG = {
+      'Comidas': `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80">
+        <path d="M16 44 C16 62 64 62 64 44" stroke="#E06500" stroke-width="2" fill="none"/>
+        <ellipse cx="40" cy="44" rx="24" ry="5" stroke="#E06500" stroke-width="2" fill="none"/>
+        <line x1="30" y1="22" x2="24" y2="50" stroke="#E06500" stroke-width="2"/>
+        <line x1="40" y1="22" x2="34" y2="50" stroke="#E06500" stroke-width="2"/>
+        <path d="M48 28 Q44 20 48 12" stroke="#E06500" stroke-width="2" fill="none"/>
+        <path d="M56 26 Q52 18 56 10" stroke="#E06500" stroke-width="2" fill="none"/>
+        <circle cx="28" cy="48" r="2" fill="#FF8C1A"/>
+        <circle cx="52" cy="46" r="1.5" fill="#FF8C1A"/>
+      </svg>`,
+      'Sobremesas': `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80">
+        <path d="M22 44 L40 28 L58 44" stroke="#E06500" stroke-width="2" fill="none"/>
+        <path d="M22 44 L22 60 L58 60 L58 44" stroke="#E06500" stroke-width="2" fill="none"/>
+        <path d="M40 28 L40 58" stroke="#E06500" stroke-width="2" fill="none"/>
+        <line x1="22" y1="48" x2="58" y2="48" stroke="#E06500" stroke-width="2"/>
+        <line x1="22" y1="52" x2="58" y2="52" stroke="#E06500" stroke-width="2"/>
+        <line x1="22" y1="56" x2="58" y2="56" stroke="#E06500" stroke-width="2"/>
+        <circle cx="40" cy="25" r="3" fill="#FF8C1A"/>
+      </svg>`,
+      'Bebidas': `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80">
+        <path d="M22 20 L26 56 L54 56 L58 20" stroke="#E06500" stroke-width="2" fill="none"/>
+        <path d="M24 58 L56 58" stroke="#E06500" stroke-width="2"/>
+        <path d="M23 38 Q40 42 57 38" stroke="#E06500" stroke-width="2" fill="none"/>
+        <circle cx="32" cy="46" r="2" fill="none" stroke="#E06500" stroke-width="2"/>
+        <circle cx="44" cy="44" r="1.5" fill="none" stroke="#E06500" stroke-width="2"/>
+        <circle cx="38" cy="50" r="1" fill="none" stroke="#E06500" stroke-width="2"/>
+        <circle cx="40" cy="28" r="2" fill="#FF8C1A"/>
+        <circle cx="30" cy="34" r="1.5" fill="#FF8C1A"/>
+      </svg>`,
+      'Bebidas Alcoólicas': `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80">
+        <path d="M18 30 L20 55 L38 55 L40 30" stroke="#E06500" stroke-width="2" fill="none"/>
+        <path d="M24 30 L26 20 L34 20 L36 30" stroke="#E06500" stroke-width="2" fill="none"/>
+        <ellipse cx="31" cy="20" rx="5" ry="2" stroke="#E06500" stroke-width="2" fill="none"/>
+        <path d="M48 50 L50 62 L62 62 L64 50" stroke="#E06500" stroke-width="2" fill="none"/>
+        <ellipse cx="56" cy="50" rx="8" ry="2" stroke="#E06500" stroke-width="2" fill="none"/>
+        <circle cx="30" cy="40" r="2" fill="#FF8C1A"/>
+      </svg>`,
+    };
+
+    function formatPrice(price) {
+      if (price === 0) return 'Grátis';
+      return price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    }
+
+    function groupByCategory(products) {
+      const groups = {};
+      for (const p of products) {
+        if (!groups[p.category]) groups[p.category] = [];
+        groups[p.category].push(p);
+      }
+      return groups;
+    }
+
+    function sortCategories(groups) {
+      const sorted = [];
+      const seen = new Set();
+      for (const cat of CATEGORY_ORDER) {
+        if (groups[cat]) { sorted.push({ name: cat, products: groups[cat] }); seen.add(cat); }
+      }
+      for (const cat of Object.keys(groups).sort()) {
+        if (!seen.has(cat)) sorted.push({ name: cat, products: groups[cat] });
+      }
+      return sorted;
+    }
+
+    function renderProducts(products) {
+      const groups = groupByCategory(products);
+      const sorted = sortCategories(groups);
+      let html = '';
+
+      sorted.forEach(({ name, products: items }) => {
+        const svg = CATEGORY_SVG[name] || '';
+        html += `
+          <section class="category-section" id="cat-${name.replace(/\s+/g, '-')}">
+            <div class="category-header">
+              <div class="cat-icon">${svg}</div>
+              <h2>${name}</h2>
+              <span class="count">${items.length}</span>
+              <div class="category-line"></div>
+            </div>
+            <div class="products-grid">
+        `;
+        items.forEach(item => {
+          const isFree = item.price === 0;
+          const imgUrl = `images/${item.id}.jpg`;
+          const hasCustoms = CUSTOMIZATIONS[item.id]?.length > 0;
+          html += `
+            <div class="product-card${hasCustoms ? ' has-customs' : ''}" data-id="${item.id}">
+              <div class="product-image">
+                <img src="${imgUrl}" alt="${item.name}" loading="lazy"
+                  onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+                <div class="placeholder-svg" style="display:none;position:absolute;inset:0;align-items:center;justify-content:center">${svg}</div>
+              </div>
+              <div class="product-body">
+                <div class="product-name">
+                  ${item.name}
+                  ${hasCustoms ? '<span class="badge">Personalizável</span>' : ''}
+                </div>
+                <div class="product-meta">
+                  <div class="product-price ${isFree ? 'free' : ''}">
+                    ${formatPrice(item.price)}
+                  </div>
+                  <div class="product-dots">
+                    <span></span><span></span><span></span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          `;
+        });
+        html += `</div></section>`;
+      });
+
+      return html;
+    }
+
+    function buildCategoryNav(sortedCategories) {
+      let nav = '';
+      sortedCategories.forEach(({ name }) => {
+        const svg = CATEGORY_SVG[name] || '';
+        nav += `<button class="category-btn" data-cat="${name.replace(/\s+/g, '-')}">
+          <span class="nav-icon">${svg}</span> ${name}
+        </button>`;
+      });
+      return nav;
+    }
+
+    function initScrollSpy() {
+      const buttons = document.querySelectorAll('.category-btn');
+      const sections = document.querySelectorAll('.category-section');
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            const id = entry.target.id;
+            buttons.forEach(btn => {
+              btn.classList.toggle('active', btn.dataset.cat === id.replace('cat-', ''));
+            });
+          }
+        });
+      }, { rootMargin: '-80px 0px -60% 0px' });
+      sections.forEach(s => observer.observe(s));
+    }
+
+    function initCategoryNav() {
+      document.querySelector('.category-nav')?.addEventListener('click', (e) => {
+        const btn = e.target.closest('.category-btn');
+        if (!btn) return;
+        const section = document.getElementById(`cat-${btn.dataset.cat}`);
+        if (section) section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    }
+
+    function openModal(productId) {
+      const product = PRODUCTS.find(p => p.id === productId);
+      if (!product) return;
+      const customs = CUSTOMIZATIONS[productId] || [];
+
+      document.getElementById('modal-title').textContent = product.name;
+      document.getElementById('modal-price').textContent = formatPrice(product.price);
+
+      let bodyHtml = '';
+      if (customs.length === 0) {
+        bodyHtml = '<div class="no-customs">Este produto não possui personalizações disponíveis</div>';
+      } else {
+        bodyHtml = '<div class="modal-section-label">Personalizações</div><ul class="custom-list">';
+        customs.forEach(c => {
+          bodyHtml += `<li>${c.description}</li>`;
+        });
+        bodyHtml += '</ul>';
+      }
+      document.getElementById('modal-body').innerHTML = bodyHtml;
+      document.getElementById('modal').classList.add('open');
+    }
+
+    function closeModal() {
+      document.getElementById('modal').classList.remove('open');
+    }
+
+    function initModal() {
+      document.getElementById('modal-close').addEventListener('click', closeModal);
+      document.getElementById('modal').addEventListener('click', (e) => {
+        if (e.target === e.currentTarget) closeModal();
+      });
+      document.getElementById('modal-btn').addEventListener('click', closeModal);
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') closeModal();
+      });
+    }
+
+    function initProductClicks() {
+      document.querySelector('#menu-content')?.addEventListener('click', (e) => {
+        const card = e.target.closest('.product-card.has-customs');
+        if (card) {
+          const id = parseInt(card.dataset.id);
+          openModal(id);
+        }
+      });
+    }
+
+    function loadMenu() {
+      const app = document.getElementById('app');
+      const groups = groupByCategory(PRODUCTS);
+      const sorted = sortCategories(groups);
+      app.innerHTML = `
+        <nav class="category-nav">${buildCategoryNav(sorted)}</nav>
+        <div id="menu-content">${renderProducts(PRODUCTS)}</div>
+      `;
+      initCategoryNav();
+      initScrollSpy();
+      initProductClicks();
+    }
+
+    function initTheme() {
+      const saved = localStorage.getItem('theme');
+      const prefersLight = window.matchMedia('(prefers-color-scheme: light)').matches;
+      const theme = saved || 'light';
+      document.documentElement.setAttribute('data-theme', theme);
+      document.getElementById('themeToggle').textContent = theme === 'dark' ? '☀️' : '🌙';
+
+      document.getElementById('themeToggle').addEventListener('click', () => {
+        const current = document.documentElement.getAttribute('data-theme');
+        const next = current === 'dark' ? 'light' : 'dark';
+        document.documentElement.setAttribute('data-theme', next);
+        document.getElementById('themeToggle').textContent = next === 'dark' ? '☀️' : '🌙';
+        localStorage.setItem('theme', next);
+      });
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      initTheme();
+      initModal();
+      loadMenu();
+    });
+  </script>
+</body>
+</html>

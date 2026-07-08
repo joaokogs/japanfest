@@ -2,25 +2,12 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
-
-type Product = {
-  id: number;
-  name: string;
-  category: string;
-  price: number;
-  priority: boolean;
-  customizable: boolean;
-};
-
-type Customization = {
-  id: number;
-  description: string;
-};
+import { mockApi, MOCK_CUSTOMIZATIONS, MOCK_PRODUCTS, type MockProduct, type MockCustomization } from "@/lib/mockData";
 
 export const ManageCustomizations: React.FC = () => {
-  const [products, setProducts] = useState<Product[]>([]);
+  const [products, setProducts] = useState<MockProduct[]>([]);
   const [selectedProductId, setSelectedProductId] = useState<number | null>(null);
-  const [customizations, setCustomizations] = useState<Customization[]>([]);
+  const [customizations, setCustomizations] = useState<MockCustomization[]>([]);
   const [newCustomization, setNewCustomization] = useState("");
   const [inputError, setInputError] = useState<string | null>(null);
   const [loadingProducts, setLoadingProducts] = useState(true);
@@ -32,20 +19,14 @@ export const ManageCustomizations: React.FC = () => {
     let mounted = true;
     const load = async () => {
       try {
-        const res = await fetch("/api/products");
+        const data = await mockApi.getProducts();
         if (!mounted) return;
-        if (res.ok) {
-          const data: Product[] = await res.json();
-          setProducts(Array.isArray(data) ? data : []);
-          setLoadError(null);
-        } else {
-          setProducts([]);
-          setLoadError("Erro ao carregar produtos do servidor.");
-        }
+        setProducts(data);
+        setLoadError(null);
       } catch {
         if (mounted) {
           setProducts([]);
-          setLoadError("Não foi possível conectar ao servidor.");
+          setLoadError("Não foi possível carregar produtos.");
         }
       } finally {
         if (mounted) setLoadingProducts(false);
@@ -58,13 +39,8 @@ export const ManageCustomizations: React.FC = () => {
   const loadCustomizations = useCallback(async (productId: number) => {
     setLoadingCustomizations(true);
     try {
-      const res = await fetch(`/api/products/${productId}/customizations`);
-      if (res.ok) {
-        const data: Customization[] = await res.json();
-        setCustomizations(Array.isArray(data) ? data : []);
-      } else {
-        setCustomizations([]);
-      }
+      const data = MOCK_CUSTOMIZATIONS[productId] ?? [];
+      setCustomizations(data);
     } catch {
       setCustomizations([]);
     } finally {
@@ -101,26 +77,11 @@ export const ManageCustomizations: React.FC = () => {
     setAdding(true);
     setInputError(null);
     try {
-      const res = await fetch("/api/products/customizations", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ product_id: selectedProductId, description: desc }),
-      });
-
-      if (res.ok) {
-        toast.success("Customização adicionada!", { description: desc });
-        setNewCustomization("");
-        void loadCustomizations(selectedProductId);
-      } else {
-        const body = await res.text();
-        toast.error("Erro ao adicionar customização", {
-          description: body || `Status ${res.status}`,
-        });
-      }
+      toast.success("Customização adicionada!", { description: desc });
+      setNewCustomization("");
+      void loadCustomizations(selectedProductId);
     } catch {
-      toast.error("Erro ao adicionar customização", {
-        description: "Não foi possível conectar ao servidor.",
-      });
+      toast.error("Erro ao adicionar customização");
     } finally {
       setAdding(false);
     }

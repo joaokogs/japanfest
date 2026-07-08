@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { OrdersCard, Order } from "@/components/ordersCard";
 import Dialog from "@/components/dialog";
 import { toast } from "sonner";
+import { mockApi, getProductImageUrl } from "@/lib/mockData";
 
 const sortOrders = (arr: Order[]) =>
     [...arr].sort((a, b) => (a.prioridade === b.prioridade ? 0 : a.prioridade ? -1 : 1));
@@ -33,60 +34,6 @@ const getLocalCustomizations = (orderId: number) => {
 	} catch { return []; }
 };
 
-const mapOrderItems = (order: any, nameToId: Map<string, number>, customizationNameMap?: Record<number, Record<number, string>>) => {
-    const source = Array.isArray(order?.items)
-        ? order.items
-        : Array.isArray(order?.products)
-            ? order.products
-            : [];
-
-    return source
-        .map((item: any, index: number) => {
-            if (typeof item === "string") {
-                const id = nameToId.get(String(item).toLowerCase());
-                return {
-                    name: item,
-                    quantity: 1,
-                    image: id ? `/api/products/${id}/image` : undefined,
-                } as any;
-            }
-
-            if (!item || typeof item !== "object") return null;
-
-            const rawName = item.name ?? item.product_name ?? item.title;
-            const name = String(rawName ?? "").trim();
-            const quantityValue = Number(item.quantity);
-            const quantity = Number.isFinite(quantityValue) && quantityValue > 0 ? quantityValue : 1;
-            const productIdValue = Number(item.product_id ?? item.id);
-            const fromProductId = Number.isFinite(productIdValue) && productIdValue > 0 ? productIdValue : undefined;
-            const fromName = name ? nameToId.get(name.toLowerCase()) : undefined;
-            const productId = fromProductId ?? fromName;
-            const note = typeof item.note === "string" ? item.note : typeof item.observation === "string" ? item.observation : undefined;
-            const customizations = Array.isArray(item.customizations) && item.customizations.length > 0
-                ? typeof item.customizations[0] === "number" || typeof item.customizations[0] === "string"
-                    ? customizationNameMap && productId && customizationNameMap[productId]
-                        ? item.customizations
-                            .map((cid: any) => {
-                                const desc = customizationNameMap[productId]?.[Number(cid)];
-                                return desc ? { id: Number(cid), description: desc } : null;
-                            })
-                            .filter(Boolean)
-                        : item.customizations.map((cid: any) => ({ id: Number(cid), description: `#${cid}` }))
-                    : item.customizations.map((c: any) => ({ id: Number(c.id), description: String(c.description ?? "") }))
-                : undefined;
-            const safeName = name || (fromProductId ? `Item #${fromProductId}` : `Item ${index + 1}`);
-
-            return {
-                name: safeName,
-                quantity,
-                note,
-                customizations,
-                image: productId ? `/api/products/${productId}/image` : undefined,
-            } as any;
-        })
-        .filter(Boolean) as any[];
-};
-
 export default function DeliveredPage() {
     const [orders, setOrders] = useState<Order[]>([]);
     const [loading, setLoading] = useState(true);
@@ -95,52 +42,22 @@ export default function DeliveredPage() {
     useEffect(() => {
         let mounted = true;
         (async () => {
-            const [productsData, ordersData] = await Promise.all([
-                fetch("/api/products").then((r) => r.ok ? r.json() : []).catch(() => []),
-                fetch("/api/orders?include=items&status=Pronto&sort=id&order=asc").then((r) => r.ok ? r.json() : []).catch(() => []),
-            ]);
+            const ordersData = await mockApi.getOrders("Pronto");
 
-            const nameToId = new Map<string, number>();
-            (productsData || []).forEach((p: any) => {
-                if (p && p.name && p.id) nameToId.set(String(p.name).toLowerCase(), p.id);
-            });
-
-            // Build customization name lookup map (fallback)
-            const productIds = new Set<number>();
-            (ordersData || []).forEach((o: any) => {
-                (o.items || []).forEach((item: any) => {
-                    if (Array.isArray(item.customization_ids) && item.customization_ids.length > 0) {
-                        const pid = Number(item.product_id ?? item.id);
-                        if (pid) productIds.add(pid);
-                    }
-                });
-            });
-            const customizationNameMap: Record<number, Record<number, string>> = {};
-            await Promise.all(
-                Array.from(productIds).map(async (pid) => {
-                    try {
-                        const res = await fetch(`/api/products/${pid}/customizations`);
-                        if (res.ok) {
-                            const options: any[] = await res.json();
-                            if (Array.isArray(options)) {
-                                customizationNameMap[pid] = {};
-                                options.forEach((opt: any) => {
-                                    customizationNameMap[pid][Number(opt.id)] = String(opt.description ?? "");
-                                });
-                            }
-                        }
-                    } catch { /* ignore */ }
-                }),
-            );
-
-            const mapped: Order[] = (ordersData || [])
+            const mapped: Order[] = ordersData
                 .map((o: any) => {
-                    const items = mapOrderItems(o, nameToId, customizationNameMap);
+                    const items = o.items.map((item: any) => ({
+                        name: item.name,
+                        quantity: item.quantity,
+                        note: item.note,
+                        image: getProductImageUrl(item.product_id || 0),
+                        customizations: item.customizations || [],
+                    }));
                     const localItems = getLocalCustomizations(Number(o.id));
                     if (localItems.length > 0) {
                         items.forEach((item: any, idx: number) => {
                             if (idx < localItems.length && localItems[idx].customizationDescs.length > 0) {
-                                item.customizations = localItems[idx].customizationDescs.map((desc, i) => ({
+                                item.customizations = localItems[idx].customizationDescs.map((desc: string, i: number) => ({
                                     id: localItems[idx].customizationIds[i] ?? 0,
                                     description: desc,
                                 }));
@@ -150,24 +67,15 @@ export default function DeliveredPage() {
                     return { id: o.id, prioridade: !!o.priority, status: o.status, items: groupItems(items) };
                 });
 
-                if (mounted) setOrders(sortOrders(mapped));
-            })().catch((err) => console.error("Failed to load orders", err))
+            if (mounted) setOrders(sortOrders(mapped));
+        })().catch((err) => console.error("Failed to load orders", err))
             .finally(() => { if (mounted) setLoading(false); });
         return () => { mounted = false; };
     }, []);
 
     const handleDeliver = async (id: number) => {
         try {
-            let res = await fetch(`/api/orders/${id}/Entregue`, { method: "PATCH" });
-            if (res.status === 404) {
-                res = await fetch(`/api/order/${id}/Entregue`, { method: "PATCH" });
-            }
-            if (!res.ok) {
-                let body = "";
-                try { body = await res.text(); } catch { body = "<unreadable>"; }
-                console.error(`Failed to deliver order. HTTP ${res.status}`, body);
-                return;
-            }
+            await mockApi.updateOrderStatus(id, "Entregue");
             setOrders((prev) => sortOrders(prev.filter((o) => o.id !== id)));
             toast.success(`Pedido #${id} foi entregue!`);
         } catch (err) {

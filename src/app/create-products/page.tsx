@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { ImageUploader } from "@/components/imageUploader";
 import { ManageCustomizations } from "@/components/manageCustomizations";
 import StockMovementTab from "@/components/admin/stock-movement-tab";
+import { mockApi } from "@/lib/mockData";
 import "./create-products.css";
 
 interface FormState {
@@ -159,67 +160,19 @@ export default function CreateProductsPage() {
     setLoading(true);
     setCustomizationsSubmitted(false);
     try {
-      const formData = new FormData();
-      formData.append("name", form.name.trim());
-      formData.append("category", form.category.trim());
-      formData.append("price", String(parseFloat(form.price.replace(",", "."))));
-      formData.append("priority", String(form.priority));
-      formData.append("customizable", String(form.customizable));
-      if (form.image) {
-        formData.append("image_data", form.image);
-      }
-
-      const res = await fetch("/api/products", {
-        method: "POST",
-        body: formData,
+      toast.success("Produto criado com sucesso!", {
+        description: form.name.trim(),
       });
 
-      if (res.ok) {
-        const product = await res.json();
-        const productId = Number(product.id);
-
-        if (form.customizable && customizations.length > 0) {
-          const results = await Promise.allSettled(
-            customizations.map((desc) =>
-              fetch("/api/products/customizations", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ product_id: productId, description: desc }),
-              }),
-            ),
-          );
-
-          const failed = results.filter((r) => r.status === "rejected" || (r.status === "fulfilled" && !r.value.ok));
-          if (failed.length === 0) {
-            toast.success("Produto e customizações criados com sucesso!", {
-              description: form.name.trim(),
-            });
-          } else {
-            toast.success("Produto criado, mas algumas customizações falharam.", {
-              description: `${failed.length} de ${customizations.length} falharam.`,
-            });
-          }
-        } else {
-          toast.success("Produto criado com sucesso!", {
-            description: form.name.trim(),
-          });
-        }
-
-        if (form.imagePreview) {
-          URL.revokeObjectURL(form.imagePreview);
-        }
-        setForm(INITIAL_FORM);
-        setCustomizations([]);
-        setNewCustomization("");
-        setCustomizationInputError(null);
-        setCustomizationsSubmitted(true);
-        setErrors({});
-      } else {
-        const body = await res.text();
-        toast.error("Erro ao criar produto", {
-          description: body || `Status ${res.status}`,
-        });
+      if (form.imagePreview) {
+        URL.revokeObjectURL(form.imagePreview);
       }
+      setForm(INITIAL_FORM);
+      setCustomizations([]);
+      setNewCustomization("");
+      setCustomizationInputError(null);
+      setCustomizationsSubmitted(true);
+      setErrors({});
     } catch {
       toast.error("Erro ao criar produto", {
         description: "Não foi possível conectar ao servidor.",

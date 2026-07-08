@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { fetchProducts, fetchStocks } from "@/lib/api";
 import type { Product, StockEntry } from "@/lib/types";
+import { getProductImageUrl } from "@/lib/mockData";
 import "@/app/admin/admin.css";
 
 interface StockRow {
@@ -91,7 +92,7 @@ export default function StockTab() {
               <td>
                 <div className="admin-product-cell">
                   <img
-                    src={`/api/products/${row.product.id}/image`}
+                    src={getProductImageUrl(row.product.id)}
                     alt={row.product.name}
                     className="admin-thumb"
                     loading="lazy"

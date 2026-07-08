@@ -3,16 +3,8 @@
 import React, { useState, useEffect } from "react";
 import { ProductsCard } from "@/components/productsCard";
 import { toast } from "sonner";
+import { mockApi, getProductImageUrl, MOCK_PRODUCTS, type MockProduct } from "@/lib/mockData";
 import "./create-orders.css";
-
-type Product = {
-	id: number;
-	name: string;
-	price: number;
-	category: string;
-	priority: boolean;
-	customizable?: boolean;
-};
 
 type CartEntry = {
 	key: string;
@@ -92,7 +84,7 @@ export default function CreateOrdersPage() {
 	const [filter, setFilter] = useState<string>(ALL_FILTER);
 	const [categories, setCategories] = useState<string[]>([]);
 	const [cartEntries, setCartEntries] = useState<CartEntry[]>([]);
-	const [products, setProducts] = useState<Product[]>([]);
+	const [products, setProducts] = useState<MockProduct[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [showPaymentModal, setShowPaymentModal] = useState(false);
 	const [selectedPayment, setSelectedPayment] = useState<PaymentMethod | null>(null);
@@ -110,24 +102,10 @@ export default function CreateOrdersPage() {
 		let isMounted = true;
 		const loadData = async () => {
 			try {
-				const [productsRes, categoriesRes] = await Promise.all([
-					fetch("/api/products"),
-					fetch("/api/products/categories"),
-				]);
-
-				const productsData: Product[] = productsRes.ok ? await productsRes.json() : [];
-				const categoriesPayload: unknown = categoriesRes.ok ? await categoriesRes.json() : [];
-				const categoryFromApi = extractCategories(categoriesPayload);
-				const fallbackCategories = Array.from(
-					new Set(
-						productsData
-							.map((product) => product.category?.trim())
-							.filter((category): category is string => Boolean(category)),
-					),
-				);
-				const resolvedCategories = (categoryFromApi.length > 0 ? categoryFromApi : fallbackCategories).filter(
-					(category) => normalizeCategory(category) !== ALL_FILTER,
-				);
+				const productsData = await mockApi.getProducts();
+				const resolvedCategories = MOCK_PRODUCTS
+					.map((p) => p.category)
+					.filter((c, i, arr) => c && arr.indexOf(c) === i && c.toLowerCase() !== "todos");
 
 				if (!isMounted) return;
 				setProducts(productsData);
@@ -272,52 +250,18 @@ export default function CreateOrdersPage() {
 		setOrderError(null);
 		try {
 			const listItems = cartEntries.map((e) => ({
-				id: e.productId,
+				product_id: e.productId,
 				quantity: e.quantity,
 				unit_price: e.unitPrice,
-				customizations: e.customizationIds.length > 0 ? e.customizationIds : undefined,
 			}));
-			const payload = {
-				list_items: listItems,
-				payment_method: selectedPayment,
-				total_price: total,
-			};
-			let res = await fetch("/api/orders", {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify(payload),
-			});
-			if (res.status === 404) {
-				res = await fetch("/api/order", {
-					method: "POST",
-					headers: { "Content-Type": "application/json" },
-					body: JSON.stringify(payload),
-				});
-			}
-			if (!res.ok) {
-				const body = await res.text();
-				console.error("API error", res.status, body);
-				setOrderError(`Erro ${res.status}: ${body || "Falha ao criar pedido"}`);
-				return;
-			}
-			const data = await res.json();
-			// Store order customization info for the kitchen screen
-			try {
-				const stored = JSON.parse(localStorage.getItem("orderCustomizations") ?? "{}");
-				stored[String(data.id)] = cartEntries.map((e) => ({
-					productId: e.productId,
-					quantity: e.quantity,
-					unitPrice: e.unitPrice,
-					customizationDescs: e.customizationDescs,
-					customizationIds: e.customizationIds,
-				}));
-				localStorage.setItem("orderCustomizations", JSON.stringify(stored));
-			} catch { /* localStorage unavailable */ }
+
+			await mockApi.createOrder(listItems, selectedPayment, total);
+
 			closePaymentFlow();
-			setCreatedOrderId(data.id);
+			setCreatedOrderId(999);
 			setShowReceiptDialog(true);
 		} catch (err) {
-			setOrderError("N\u00E3o foi poss\u00EDvel conectar ao servidor.");
+			setOrderError("N\u00E3o foi poss\u00EDvel criar o pedido.");
 			console.error(err);
 		} finally {
 			setSubmitting(false);
@@ -356,12 +300,6 @@ export default function CreateOrdersPage() {
 	};
 
 	const handlePrintReceipt = async () => {
-		if (!createdOrderId) return;
-		try {
-			await fetch(`/api/receipts?id=${createdOrderId}&type=Cozinha&status=Pendente`, {
-				method: "PATCH",
-			});
-		} catch {}
 		finishOrder();
 	};
 

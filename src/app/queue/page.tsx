@@ -3,14 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import QueueCard from "@/components/queueCard";
 import ReadyCelebration from "@/components/readyCelebration";
-
-type OrderEventPayload = {
-  id?: number | string;
-  status?: string;
-};
-
-const toOrderId = (value: unknown) => String(value ?? "").trim();
-const normalizeStatus = (value: unknown) => String(value ?? "").trim().toLowerCase();
+import { mockApi } from "@/lib/mockData";
 
 const sortOrderIds = (ids: string[]) =>
   Array.from(new Set(ids.filter(Boolean))).sort((a, b) => {
@@ -58,20 +51,8 @@ export default function QueuePage() {
 
   const fetchOrders = async () => {
     try {
-      const r = await fetch("/api/orders?sort=id&status=Fila&status=Pronto&order=asc");
-      if (!r.ok) {
-        const txt = await r.text().catch(() => "<no body>");
-        console.error(`Failed to fetch /api/orders. HTTP ${r.status}`, txt);
-        return null;
-      }
-      const ct = (r.headers.get("content-type") || "").toLowerCase();
-      if (!ct.includes("application/json")) {
-        const text = await r.text().catch(() => "<unreadable>");
-        console.error("/api/orders returned non-JSON:", text);
-        return null;
-      }
-      const data: any[] = await r.json();
-      return data || [];
+      const allOrders = await mockApi.getOrders();
+      return allOrders.filter((o) => o.status === "Fila" || o.status === "Pronto");
     } catch (err) {
       console.error("Failed to load orders", err);
       return null;
@@ -121,8 +102,6 @@ export default function QueuePage() {
   }, []);
 
   useEffect(() => {
-    let source: EventSource | null = null;
-    let reconnectTimer: number | null = null;
     let pollTimer: number | null = null;
     let mounted = true;
 
@@ -132,61 +111,29 @@ export default function QueuePage() {
       if (mounted && data) applyOrders(data, true);
     };
 
-    const connect = () => {
-      source = new EventSource("/api/events/orders");
-
-      source.onmessage = (event) => {
-        let payload: OrderEventPayload | null = null;
-        try {
-          payload = JSON.parse(event.data);
-        } catch {
-          return;
-        }
-
-        const orderId = toOrderId(payload?.id);
-        const status = normalizeStatus(payload?.status);
-        if (!orderId || !status) return;
-
-        if (status === "pronto") {
-          enqueueReadyCelebration(orderId);
-          return;
-        }
-
-        if (status === "fila" || status === "em preparo" || status === "preparando") {
-          setReadyCelebrationQueue((prev) => prev.filter((id) => id !== orderId));
-          if (activeCelebrationRef.current === orderId) setActiveCelebration(null);
-          setReady((prev) => prev.filter((id) => id !== orderId));
-          setPreparing((prev) => sortOrderIds([...prev, orderId]));
-          return;
-        }
-
-        if (status === "entregue" || status === "cancelado") {
-          setReadyCelebrationQueue((prev) => prev.filter((id) => id !== orderId));
-          if (activeCelebrationRef.current === orderId) setActiveCelebration(null);
-          setReady((prev) => prev.filter((id) => id !== orderId));
-          setPreparing((prev) => prev.filter((id) => id !== orderId));
-        }
-      };
-
-      source.onerror = () => {
-        source?.close();
-        if (!mounted) return;
-        reconnectTimer = window.setTimeout(async () => {
-          await pollAndRefresh();
-          connect();
-        }, 5000);
-      };
+    const handleOrderCreated = () => {
+      if (!mounted) return;
+      void pollAndRefresh();
     };
 
-    connect();
+    const handleOrderUpdated = (e: Event) => {
+      if (!mounted) return;
+      void pollAndRefresh();
+    };
 
-    pollTimer = window.setInterval(pollAndRefresh, 3000);
+    window.addEventListener("japanfest:order-created", handleOrderCreated);
+    window.addEventListener("japanfest:order-updated", handleOrderUpdated);
+
+    const startPoll = () => {
+      pollTimer = window.setInterval(pollAndRefresh, 5000);
+    };
+    startPoll();
 
     return () => {
       mounted = false;
-      source?.close();
-      if (reconnectTimer) window.clearTimeout(reconnectTimer);
       if (pollTimer) window.clearInterval(pollTimer);
+      window.removeEventListener("japanfest:order-created", handleOrderCreated);
+      window.removeEventListener("japanfest:order-updated", handleOrderUpdated);
     };
   }, []);
 
