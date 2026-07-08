@@ -6,6 +6,7 @@ type ReadyCelebrationProps = {
   label: string;
   onDone: () => void;
   durationMs?: number;
+  fontScale?: number;
 };
 
 const BG_COLORS = [
@@ -36,7 +37,7 @@ function randomBetween(a: number, b: number) {
   return a + Math.random() * (b - a);
 }
 
-export const ReadyCelebration: React.FC<ReadyCelebrationProps> = ({ label, onDone, durationMs = 4000 }) => {
+export const ReadyCelebration: React.FC<ReadyCelebrationProps> = ({ label, onDone, durationMs = 4000, fontScale = 1 }) => {
   const safeDurationMs = Math.min(Math.max(durationMs, 1000), 15000);
   const onDoneRef = useRef(onDone);
   const bg = useMemo(
@@ -147,10 +148,10 @@ export const ReadyCelebration: React.FC<ReadyCelebrationProps> = ({ label, onDon
       >
         <div
           style={{
-            fontSize: 14,
+            fontSize: 14 * fontScale,
             fontWeight: 700,
             color: "rgba(255,255,255,0.75)",
-            letterSpacing: 6,
+            letterSpacing: 6 * fontScale,
             textTransform: "uppercase",
           }}
         >
@@ -159,7 +160,7 @@ export const ReadyCelebration: React.FC<ReadyCelebrationProps> = ({ label, onDon
 
         <div
           style={{
-            fontSize: "clamp(120px, 22vw, 260px)",
+            fontSize: `clamp(${120 * fontScale}px, ${22 * fontScale}vw, ${260 * fontScale}px)`,
             fontWeight: 900,
             color: "#fff",
             lineHeight: 1,
@@ -173,10 +174,10 @@ export const ReadyCelebration: React.FC<ReadyCelebrationProps> = ({ label, onDon
 
         <div
           style={{
-            fontSize: 18,
+            fontSize: 18 * fontScale,
             fontWeight: 500,
             color: "rgba(255,255,255,0.70)",
-            letterSpacing: 1,
+            letterSpacing: 1 * fontScale,
           }}
         >
           Retire seu pedido no balcão
