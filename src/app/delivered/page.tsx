@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { OrdersCard, Order } from "@/components/ordersCard";
 import Dialog from "@/components/dialog";
 import { toast } from "sonner";
@@ -23,6 +23,12 @@ const groupItems = (items: any[]) => {
     }
     return grouped;
 };
+
+const normalizeStatus = (value: unknown) => String(value ?? "").trim().toLowerCase();
+const toOrderId = (value: unknown) => Number(value);
+
+let cachedProducts: any[] | null = null;
+let cachedCustomizationMap: Record<number, Record<number, string>> = {};
 
 const getLocalCustomizations = (orderId: number) => {
 	try {
@@ -92,20 +98,27 @@ export default function DeliveredPage() {
     const [loading, setLoading] = useState(true);
     const [pendingId, setPendingId] = useState<number | null>(null);
 
-    useEffect(() => {
-        let mounted = true;
-        (async () => {
-            const [productsData, ordersData] = await Promise.all([
-                fetch("/api/products").then((r) => r.ok ? r.json() : []).catch(() => []),
-                fetch("/api/orders?include=items&status=Pronto&sort=id&order=asc").then((r) => r.ok ? r.json() : []).catch(() => []),
-            ]);
+    const fetchOrdersReady = useCallback(async (): Promise<Order[]> => {
+        let productsData: any[];
+        if (cachedProducts) {
+            productsData = cachedProducts;
+        } else {
+            productsData = await fetch("/api/products").then((r) => r.ok ? r.json() : []).catch(() => []);
+            cachedProducts = productsData;
+        }
 
-            const nameToId = new Map<string, number>();
-            (productsData || []).forEach((p: any) => {
-                if (p && p.name && p.id) nameToId.set(String(p.name).toLowerCase(), p.id);
-            });
+        const ordersData = await fetch("/api/orders?include=items&status=Pronto&sort=id&order=asc").then((r) => r.ok ? r.json() : []).catch(() => []);
 
-            // Build customization name lookup map (fallback)
+        const nameToId = new Map<string, number>();
+        (productsData || []).forEach((p: any) => {
+            if (p && p.name && p.id) nameToId.set(String(p.name).toLowerCase(), p.id);
+        });
+
+        let customizationNameMap: Record<number, Record<number, string>>;
+        if (Object.keys(cachedCustomizationMap).length > 0) {
+            customizationNameMap = cachedCustomizationMap;
+        } else {
+            customizationNameMap = {};
             const productIds = new Set<number>();
             (ordersData || []).forEach((o: any) => {
                 (o.items || []).forEach((item: any) => {
@@ -115,7 +128,6 @@ export default function DeliveredPage() {
                     }
                 });
             });
-            const customizationNameMap: Record<number, Record<number, string>> = {};
             await Promise.all(
                 Array.from(productIds).map(async (pid) => {
                     try {
@@ -132,29 +144,37 @@ export default function DeliveredPage() {
                     } catch { /* ignore */ }
                 }),
             );
+            cachedCustomizationMap = customizationNameMap;
+        }
 
-            const mapped: Order[] = (ordersData || [])
-                .map((o: any) => {
-                    const items = mapOrderItems(o, nameToId, customizationNameMap);
-                    const localItems = getLocalCustomizations(Number(o.id));
-                    if (localItems.length > 0) {
-                        items.forEach((item: any, idx: number) => {
-                            if (idx < localItems.length && localItems[idx].customizationDescs.length > 0) {
-                                item.customizations = localItems[idx].customizationDescs.map((desc, i) => ({
-                                    id: localItems[idx].customizationIds[i] ?? 0,
-                                    description: desc,
-                                }));
-                            }
-                        });
-                    }
-                    return { id: o.id, prioridade: !!o.priority, status: o.status, items: groupItems(items) };
-                });
+        const mapped: Order[] = (ordersData || [])
+            .map((o: any) => {
+                const items = mapOrderItems(o, nameToId, customizationNameMap);
+                const localItems = getLocalCustomizations(Number(o.id));
+                if (localItems.length > 0) {
+                    items.forEach((item: any, idx: number) => {
+                        if (idx < localItems.length && localItems[idx].customizationDescs.length > 0) {
+                            item.customizations = localItems[idx].customizationDescs.map((desc, i) => ({
+                                id: localItems[idx].customizationIds[i] ?? 0,
+                                description: desc,
+                            }));
+                        }
+                    });
+                }
+                return { id: o.id, prioridade: !!o.priority, status: o.status, items: groupItems(items) };
+            });
 
-                if (mounted) setOrders(sortOrders(mapped));
-            })().catch((err) => console.error("Failed to load orders", err))
-            .finally(() => { if (mounted) setLoading(false); });
-        return () => { mounted = false; };
+        return sortOrders(mapped);
     }, []);
+
+    const refreshOrders = useCallback(async () => {
+        try {
+            const mapped = await fetchOrdersReady();
+            setOrders(mapped);
+        } catch (err) {
+            console.error("Failed to refresh orders list", err);
+        }
+    }, [fetchOrdersReady]);
 
     const handleDeliver = async (id: number) => {
         try {
@@ -174,6 +194,92 @@ export default function DeliveredPage() {
             console.error("Failed to deliver order", err);
         }
     };
+
+    useEffect(() => {
+        let mounted = true;
+        const load = async () => {
+            try {
+                const mapped = await fetchOrdersReady();
+                if (!mounted) return;
+                setOrders(mapped);
+            } catch (err) {
+                console.error("Failed to load orders", err);
+            } finally {
+                if (mounted) setLoading(false);
+            }
+        };
+        void load();
+        return () => { mounted = false; };
+    }, [fetchOrdersReady]);
+
+    useEffect(() => {
+        let source: EventSource | null = null;
+        let reconnectTimer: number | null = null;
+        let pollTimer: number | null = null;
+        let mounted = true;
+
+        const pollAndRefresh = async () => {
+            if (!mounted) return;
+            try {
+                const mapped = await fetchOrdersReady();
+                if (mounted) setOrders(mapped);
+            } catch { /* ignore */ }
+        };
+
+        const connect = () => {
+            source = new EventSource("/api/events/orders");
+
+            source.onmessage = (event) => {
+                let payload: { id?: number | string; status?: string } | null = null;
+                try {
+                    payload = JSON.parse(event.data);
+                } catch {
+                    return;
+                }
+
+                const status = normalizeStatus(payload?.status);
+                const orderId = toOrderId(payload?.id);
+                if (!status) return;
+
+                if (status === "pronto" || status === "fila" || status === "novo" || status === "recebido" || status === "em preparo" || status === "preparando") {
+                    void refreshOrders();
+                    return;
+                }
+
+                if (status === "entregue" || status === "cancelado") {
+                    if (Number.isFinite(orderId)) {
+                        setOrders((prev) => sortOrders(prev.filter((o) => o.id !== orderId)));
+                    } else {
+                        void refreshOrders();
+                    }
+                    return;
+                }
+
+                void refreshOrders();
+            };
+
+            source.onerror = () => {
+                source?.close();
+                if (!mounted) return;
+                reconnectTimer = window.setTimeout(() => {
+                    if (!mounted) return;
+                    void refreshOrders();
+                    connect();
+                }, 5000);
+            };
+        };
+
+        connect();
+
+        pollTimer = window.setInterval(pollAndRefresh, 3000);
+
+        return () => {
+            mounted = false;
+            source?.close();
+            if (reconnectTimer) window.clearTimeout(reconnectTimer);
+            if (pollTimer) window.clearInterval(pollTimer);
+        };
+    }, [fetchOrdersReady, refreshOrders]);
 
     if (loading) return <div style={{ padding: 24, color: "#888" }}>Carregando pedidos...</div>;
 

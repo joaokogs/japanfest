@@ -218,7 +218,16 @@ export default function OrdersPage() {
     useEffect(() => {
         let source: EventSource | null = null;
         let reconnectTimer: number | null = null;
+        let pollTimer: number | null = null;
         let mounted = true;
+
+        const pollAndRefresh = async () => {
+            if (!mounted) return;
+            try {
+                const mapped = await fetchOrdersInQueue();
+                if (mounted) setOrders(mapped);
+            } catch { /* ignore */ }
+        };
 
         const connect = () => {
             source = new EventSource("/api/events/orders");
@@ -257,7 +266,7 @@ export default function OrdersPage() {
                 if (!mounted) return;
                 reconnectTimer = window.setTimeout(() => {
                     if (!mounted) return;
-                    void refreshOrders();
+                    void pollAndRefresh();
                     connect();
                 }, 5000);
             };
@@ -265,12 +274,15 @@ export default function OrdersPage() {
 
         connect();
 
+        pollTimer = window.setInterval(pollAndRefresh, 3000);
+
         return () => {
             mounted = false;
             source?.close();
             if (reconnectTimer) window.clearTimeout(reconnectTimer);
+            if (pollTimer) window.clearInterval(pollTimer);
         };
-    }, [refreshOrders]);
+    }, [fetchOrdersInQueue, refreshOrders]);
 
     if (loading) return <div style={{ padding: 24, color: "#888" }}>Carregando pedidos...</div>;
 

@@ -165,7 +165,10 @@ export default function QueuePage() {
           if (activeCelebrationRef.current === orderId) setActiveCelebration(null);
           setReady((prev) => prev.filter((id) => id !== orderId));
           setPreparing((prev) => prev.filter((id) => id !== orderId));
+          return;
         }
+
+        void pollAndRefresh();
       };
 
       source.onerror = () => {
