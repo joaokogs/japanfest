@@ -68,19 +68,20 @@ const mapOrderItems = (order: any, nameToId: Map<string, number>, customizationN
             const fromName = name ? nameToId.get(name.toLowerCase()) : undefined;
             const productId = fromProductId ?? fromName;
             const note = typeof item.note === "string" ? item.note : typeof item.observation === "string" ? item.observation : undefined;
-            const customizations = Array.isArray(item.customizations) && item.customizations.length > 0
-                ? typeof item.customizations[0] === "number" || typeof item.customizations[0] === "string"
+            const rawCust = item.customizations ?? item.customization_ids;
+            const customizations = Array.isArray(rawCust) && rawCust.length > 0
+                ? typeof rawCust[0] === "number" || typeof rawCust[0] === "string"
                     // Backend returned array of IDs
                     ? customizationNameMap && productId && customizationNameMap[productId]
-                        ? item.customizations
+                        ? rawCust
                             .map((cid: any) => {
                                 const desc = customizationNameMap[productId]?.[Number(cid)];
                                 return desc ? { id: Number(cid), description: desc } : null;
                             })
                             .filter(Boolean)
-                        : item.customizations.map((cid: any) => ({ id: Number(cid), description: `#${cid}` }))
+                        : rawCust.map((cid: any) => ({ id: Number(cid), description: `#${cid}` }))
                     // Backend returned array of objects {id, description}
-                    : item.customizations.map((c: any) => ({ id: Number(c.id), description: String(c.description ?? "") }))
+                    : rawCust.map((c: any) => ({ id: Number(c.id), description: String(c.description ?? "") }))
                 : undefined;
             const safeName = name || (fromProductId ? `Item #${fromProductId}` : `Item ${index + 1}`);
 

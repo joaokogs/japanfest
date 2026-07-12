@@ -132,7 +132,9 @@ function mapOrderItems(
   const source = order.products ?? order.items ?? [];
   return source.map((item) => {
     const prod = productMap.get(item.product_id);
-    const customizations = parseCustomizations(item.customizations);
+    const customizations = parseCustomizations(
+      (item as any).customizations ?? (item as any).customization_ids,
+    );
 
     return {
       name: item.name || prod?.name || `Produto #${item.product_id}`,
@@ -145,14 +147,15 @@ function mapOrderItems(
 }
 
 function parseCustomizations(
-  raw: string[] | null | undefined,
+  raw: (string | number)[] | null | undefined,
 ): { id: number; description: string }[] {
   if (!raw || raw.length === 0) return [];
   const result: { id: number; description: string }[] = [];
   let idCounter = 0;
   for (const entry of raw) {
+    const str = String(entry);
     // Some entries are comma-separated like "teste,teste2,teste3"
-    const parts = entry.split(",").map((s) => s.trim()).filter(Boolean);
+    const parts = str.split(",").map((s) => s.trim()).filter(Boolean);
     for (const part of parts) {
       result.push({ id: ++idCounter, description: part });
     }
